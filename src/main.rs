@@ -36,6 +36,9 @@ fn main() -> Result<()> {
         match *stmt {
             TopLevel::Function(ref func) => {
                 println!("Parsed function: {}", *func.name);
+                println!("Parameters: {:?}", func.params);
+                println!("Return Type: {:?}", func.return_type);
+                println!("Body: {:?}", func.body);
             }
             _ => {
                 println!("Parsed top-level item.");

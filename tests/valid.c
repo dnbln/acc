@@ -5,7 +5,7 @@ int factorial(int n) {
   return n * factorial(n - 1);
 }
 
-int main(void) {
+int main() {
   int x = 0;
   int result;
 
@@ -18,6 +18,8 @@ int main(void) {
   for (int i = 0; i < 10; i++) {
     result += i;
   }
+
+  factorial(result);
 
   return 0;
 }
