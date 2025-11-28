@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="267" height="203">
+   <defs>
+      <style type="text/css">
+    @namespace "http://www.w3.org/2000/svg";
+    .line                 {fill: none; stroke: #332900; stroke-width: 1;}
+    .bold-line            {stroke: #141000; shape-rendering: crispEdges; stroke-width: 2;}
+    .thin-line            {stroke: #1F1800; shape-rendering: crispEdges}
+    .filled               {fill: #332900; stroke: none;}
+    text.terminal         {font-family: Verdana, Sans-serif;
+                            font-size: 12px;
+                            fill: #141000;
+                            font-weight: bold;
+                          }
+    text.nonterminal      {font-family: Verdana, Sans-serif;
+                            font-size: 12px;
+                            fill: #1A1400;
+                            font-weight: normal;
+                          }
+    text.regexp           {font-family: Verdana, Sans-serif;
+                            font-size: 12px;
+                            fill: #1F1800;
+                            font-weight: normal;
+                          }
+    rect, circle, polygon {fill: #332900; stroke: #332900;}
+    rect.terminal         {fill: #FFDB4D; stroke: #332900; stroke-width: 1;}
+    rect.nonterminal      {fill: #FFEC9E; stroke: #332900; stroke-width: 1;}
+    rect.text             {fill: none; stroke: none;}
+    polygon.regexp        {fill: #FFF4C7; stroke: #332900; stroke-width: 1;}
+  </style>
+   </defs>
+   <polygon points="9 139 1 135 1 143"/>
+   <polygon points="17 139 9 135 9 143"/>
+   <a xmlns:xlink="http://www.w3.org/1999/xlink"
+      xlink:href="#letter"
+      xlink:title="letter">
+      <rect x="51" y="125" width="54" height="32"/>
+      <rect x="49" y="123" width="54" height="32" class="nonterminal"/>
+      <text class="nonterminal" x="59" y="143">letter</text>
+   </a>
+   <rect x="51" y="169" width="28" height="32" rx="10"/>
+   <rect x="49"
+         y="167"
+         width="28"
+         height="32"
+         class="terminal"
+         rx="10"/>
+   <text class="terminal" x="59" y="187">_</text>
+   <a xmlns:xlink="http://www.w3.org/1999/xlink"
+      xlink:href="#letter"
+      xlink:title="letter">
+      <rect x="165" y="91" width="54" height="32"/>
+      <rect x="163" y="89" width="54" height="32" class="nonterminal"/>
+      <text class="nonterminal" x="173" y="109">letter</text>
+   </a>
+   <a xmlns:xlink="http://www.w3.org/1999/xlink"
+      xlink:href="#digit"
+      xlink:title="digit">
+      <rect x="165" y="47" width="48" height="32"/>
+      <rect x="163" y="45" width="48" height="32" class="nonterminal"/>
+      <text class="nonterminal" x="173" y="65">digit</text>
+   </a>
+   <rect x="165" y="3" width="28" height="32" rx="10"/>
+   <rect x="163"
+         y="1"
+         width="28"
+         height="32"
+         class="terminal"
+         rx="10"/>
+   <text class="terminal" x="173" y="21">_</text>
+   <path class="line"
+         d="m17 139 h2 m20 0 h10 m54 0 h10 m-94 0 h20 m74 0 h20 m-114 0 q10 0 10 10 m94 0 q0 -10 10 -10 m-104 10 v24 m94 0 v-24 m-94 24 q0 10 10 10 m74 0 q10 0 10 -10 m-84 10 h10 m28 0 h10 m0 0 h26 m40 -44 h10 m0 0 h64 m-94 0 l20 0 m-1 0 q-9 0 -9 -10 l0 -14 q0 -10 10 -10 m74 34 l20 0 m-20 0 q10 0 10 -10 l0 -14 q0 -10 -10 -10 m-74 0 h10 m54 0 h10 m-84 10 l0 -44 q0 -10 10 -10 m84 54 l0 -44 q0 -10 -10 -10 m-74 0 h10 m48 0 h10 m0 0 h6 m-84 10 l0 -44 q0 -10 10 -10 m84 54 l0 -44 q0 -10 -10 -10 m-74 0 h10 m28 0 h10 m0 0 h26 m23 122 h-3"/>
+   <polygon points="257 139 265 135 265 143"/>
+   <polygon points="257 139 249 135 249 143"/>
+</svg>

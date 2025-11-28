@@ -26,8 +26,6 @@ pub enum TokenKind {
     Float,
     #[token("char")]
     Char,
-    #[token("void")]
-    Void,
 
     // Literals
     #[regex(r"[0-9]+\.[0-9]+", |lex| lex.slice().parse::<f64>().ok())]
@@ -39,11 +37,6 @@ pub enum TokenKind {
         s.chars().nth(1)
     })]
     CharLit(char),
-    #[regex(r#""([^"\\]|\\.)*""#, |lex| {
-        let s = lex.slice();
-        s[1..s.len()-1].to_string()
-    })]
-    StringLit(String),
 
     // Identifier
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -74,8 +67,6 @@ pub enum TokenKind {
     MulEq,
     #[token("/=")]
     DivEq,
-    #[token("->")]
-    Arrow,
     #[token("<<")]
     Shl,
     #[token(">>")]
@@ -108,8 +99,6 @@ pub enum TokenKind {
     Caret,
     #[token("~")]
     Tilde,
-    #[token(".")]
-    Dot,
     #[token(",")]
     Comma,
     #[token(";")]
@@ -158,8 +147,6 @@ impl TokenKind {
             TokenKind::DivEq => "/=",
             TokenKind::Shl => "<<",
             TokenKind::Shr => ">>",
-            TokenKind::Dot => ".",
-            TokenKind::Arrow => "->",
             _ => return None,
         })
     }
@@ -176,11 +163,9 @@ impl TokenKind {
             TokenKind::Int => "'int'",
             TokenKind::Float => "'float'",
             TokenKind::Char => "'char'",
-            TokenKind::Void => "'void'",
             TokenKind::FloatLit(_) => "float literal",
             TokenKind::IntLit(_) => "integer literal",
             TokenKind::CharLit(_) => "character literal",
-            TokenKind::StringLit(_) => "string literal",
             TokenKind::Ident(_) => "identifier",
             TokenKind::PlusPlus => "'++'",
             TokenKind::MinusMinus => "'--'",
@@ -194,7 +179,6 @@ impl TokenKind {
             TokenKind::MinusEq => "'-='",
             TokenKind::MulEq => "'*='",
             TokenKind::DivEq => "'/='",
-            TokenKind::Arrow => "'->'",
             TokenKind::Shl => "'<<'",
             TokenKind::Shr => "'>>'",
             TokenKind::Plus => "'+'",
@@ -210,7 +194,6 @@ impl TokenKind {
             TokenKind::Pipe => "'|'",
             TokenKind::Caret => "'^'",
             TokenKind::Tilde => "'~'",
-            TokenKind::Dot => "'.'",
             TokenKind::Comma => "','",
             TokenKind::Semi => "';'",
             TokenKind::LParen => "'('",

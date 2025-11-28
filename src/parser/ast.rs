@@ -6,8 +6,6 @@ pub enum Type {
     Int,
     Float,
     Char,
-    Void,
-    Array(Box<Spanned<Type>>, Option<usize>),
 }
 
 #[derive(Debug, Clone)]
@@ -16,7 +14,6 @@ pub enum Expr {
     IntLit(i64),
     FloatLit(f64),
     CharLit(char),
-    StringLit(String),
     Ident(String),
     BinOp {
         op: String,

@@ -112,10 +112,6 @@ impl Parser {
                 self.advance();
                 Type::Char
             }
-            TokenKind::Void => {
-                self.advance();
-                Type::Void
-            }
             _ => {
                 return Err(ParseError::new(
                     ParseErrorKind::ExpectedType {
@@ -247,11 +243,6 @@ impl Parser {
                 self.advance();
                 Ok(Spanned::new(Expr::CharLit(c), tok.span))
             }
-            TokenKind::StringLit(s) => {
-                let s = s.clone();
-                self.advance();
-                Ok(Spanned::new(Expr::StringLit(s), tok.span))
-            }
             TokenKind::Ident(name) => {
                 let name = name.clone();
                 self.advance();
@@ -308,7 +299,7 @@ impl Parser {
     fn is_type_start(&self) -> bool {
         matches!(
             self.peek_kind(),
-            TokenKind::Int | TokenKind::Float | TokenKind::Char | TokenKind::Void
+            TokenKind::Int | TokenKind::Float | TokenKind::Char
         )
     }
 
@@ -562,10 +553,7 @@ impl Parser {
     ) -> ParseResult<Vec<(Spanned<Type>, Spanned<String>)>> {
         let mut params = Vec::new();
 
-        if self.next_is(&TokenKind::RParen) || self.next_is(&TokenKind::Void) {
-            if self.next_is(&TokenKind::Void) {
-                self.advance();
-            }
+        if self.next_is(&TokenKind::RParen) {
             return Ok(params);
         }
 
