@@ -12,16 +12,14 @@ pub enum Type {
 #[allow(dead_code)]
 pub enum Expr {
     IntLit(i64),
-    FloatLit(f64),
-    CharLit(char),
     Ident(String),
     BinOp {
-        op: String,
+        op: Spanned<String>,
         left: Box<Spanned<Expr>>,
         right: Box<Spanned<Expr>>,
     },
     UnaryOp {
-        op: String,
+        op: Spanned<String>,
         expr: Box<Spanned<Expr>>,
         prefix: bool,
     },

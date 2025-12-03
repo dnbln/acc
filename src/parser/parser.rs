@@ -178,11 +178,12 @@ impl Parser {
                 if let Some(bp) = self.config.get_postfix(op_str) {
                     if bp >= min_bp {
                         let op = op_str.to_string();
+                        let op_span = self.current_span();
                         self.advance();
                         let span = self.span_from(start);
                         lhs = Spanned::new(
                             Expr::UnaryOp {
-                                op,
+                                op: Spanned::new(op, op_span),
                                 expr: Box::new(lhs),
                                 prefix: false,
                             },
@@ -205,6 +206,7 @@ impl Parser {
             if l_bp < min_bp {
                 break;
             }
+            let op_span = self.current_span();
 
             self.advance();
 
@@ -212,7 +214,7 @@ impl Parser {
             let span = self.span_from(start);
             lhs = Spanned::new(
                 Expr::BinOp {
-                    op,
+                    op: Spanned::new(op, op_span),
                     left: Box::new(lhs),
                     right: Box::new(rhs),
                 },
@@ -232,16 +234,6 @@ impl Parser {
                 let n = *n;
                 self.advance();
                 Ok(Spanned::new(Expr::IntLit(n), tok.span))
-            }
-            TokenKind::FloatLit(n) => {
-                let n = *n;
-                self.advance();
-                Ok(Spanned::new(Expr::FloatLit(n), tok.span))
-            }
-            TokenKind::CharLit(c) => {
-                let c = *c;
-                self.advance();
-                Ok(Spanned::new(Expr::CharLit(c), tok.span))
             }
             TokenKind::Ident(name) => {
                 let name = name.clone();
@@ -273,7 +265,7 @@ impl Parser {
                         let span = self.span_from(start);
                         return Ok(Spanned::new(
                             Expr::UnaryOp {
-                                op,
+                                op: Spanned::new(op, tok.span),
                                 expr: Box::new(expr),
                                 prefix: true,
                             },
