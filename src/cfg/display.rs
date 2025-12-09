@@ -45,8 +45,11 @@ impl Display for CfgInstruction {
 impl Display for TailCfgInstruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TailCfgInstruction::Return { value } => {
-                write!(f, "return {:?}", value)
+            TailCfgInstruction::Return { value: None } => {
+                write!(f, "return")
+            }
+            TailCfgInstruction::Return { value: Some(value) } => {
+                write!(f, "return {}", value)
             }
             TailCfgInstruction::UncondBranch { target } => {
                 write!(f, "br {:?}", target)
