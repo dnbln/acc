@@ -1,3 +1,5 @@
+use crate::parser::{operator::{BinaryOp, UnaryOp}, span::Span};
+
 use super::span::Spanned;
 
 #[derive(Debug, Clone)]
@@ -8,18 +10,21 @@ pub enum Type {
     Char,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RefId(pub(super) usize);
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Expr {
     IntLit(i64),
-    Ident(String),
+    Ident(RefId, String),
     BinOp {
-        op: Spanned<String>,
+        op: Spanned<BinaryOp>,
         left: Box<Spanned<Expr>>,
         right: Box<Spanned<Expr>>,
     },
     UnaryOp {
-        op: Spanned<String>,
+        op: Spanned<UnaryOp>,
         expr: Box<Spanned<Expr>>,
         prefix: bool,
     },
@@ -32,6 +37,15 @@ pub enum Expr {
         func: Box<Spanned<Expr>>,
         args: Vec<Spanned<Expr>>,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VarId(pub(super) usize);
+
+impl VarId {
+    pub(crate) fn get_id(&self) -> usize {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +72,7 @@ pub enum Stmt {
     Break,
     Continue,
     VarDecl {
+        id: VarId,
         ty: Spanned<Type>,
         name: Spanned<String>,
         init: Option<Spanned<Expr>>,
@@ -69,17 +84,24 @@ pub enum Stmt {
 pub struct Function {
     pub return_type: Spanned<Type>,
     pub name: Spanned<String>,
-    pub params: Vec<(Spanned<Type>, Spanned<String>)>,
+    pub params: Vec<(Spanned<Type>, Spanned<String>, VarId)>,
     pub body: Option<Spanned<Stmt>>,
 }
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum TopLevel {
-    Function(Function),
+    Function(Function, VarId),
     GlobalVar {
         ty: Spanned<Type>,
         name: Spanned<String>,
         init: Option<Spanned<Expr>>,
+        span: Span,
+        id: VarId,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub items: Vec<Spanned<TopLevel>>,
 }

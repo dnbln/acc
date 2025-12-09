@@ -1,6 +1,26 @@
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
-use logos::Span;
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl Span {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    pub fn range(self) -> std::ops::Range<usize> {
+        self.start..self.end
+    }
+}
+
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}..{}", self.start, self.end)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Spanned<T> {

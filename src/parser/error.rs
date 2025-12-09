@@ -1,6 +1,5 @@
-use crate::diagnostics::IntoDiagnostic;
+use crate::{diagnostics::IntoDiagnostic, parser::span::Span};
 use codespan_reporting::diagnostic::{Diagnostic, Label};
-use logos::Span;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -47,49 +46,49 @@ impl IntoDiagnostic for ParseError {
             ParseErrorKind::UnexpectedToken { expected, found } => Diagnostic::error()
                 .with_message(format!("unexpected token"))
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message(format!("expected {}, found {}", expected, found)),
                 ]),
 
             ParseErrorKind::UnexpectedEof { expected } => Diagnostic::error()
                 .with_message("unexpected end of file")
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message(format!("expected {} here", expected)),
                 ]),
 
             ParseErrorKind::InvalidToken => Diagnostic::error()
                 .with_message("invalid token")
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message("unrecognized character sequence"),
                 ]),
 
             ParseErrorKind::UnknownPrefixOperator(op) => Diagnostic::error()
                 .with_message(format!("'{}' cannot be used as a prefix operator", op))
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message("not a valid prefix operator"),
                 ]),
 
             ParseErrorKind::ExpectedExpression { found } => Diagnostic::error()
                 .with_message("expected expression")
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message(format!("expected expression, found {}", found)),
                 ]),
 
             ParseErrorKind::ExpectedType { found } => Diagnostic::error()
                 .with_message("expected type")
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message(format!("expected type specifier, found {}", found)),
                 ]),
 
             ParseErrorKind::ExpectedIdentifier { found } => Diagnostic::error()
                 .with_message("expected identifier")
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message(format!("expected identifier, found {}", found)),
                 ]),
 
@@ -99,9 +98,9 @@ impl IntoDiagnostic for ParseError {
             } => Diagnostic::error()
                 .with_message(format!("unclosed {}", delimiter))
                 .with_labels(vec![
-                    Label::primary(file_id, self.span.clone())
+                    Label::primary(file_id, self.span.range())
                         .with_message(format!("expected closing {}", delimiter)),
-                    Label::secondary(file_id, opened_at.clone())
+                    Label::secondary(file_id, opened_at.range())
                         .with_message("opening delimiter here"),
                 ]),
         }

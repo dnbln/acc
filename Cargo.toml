@@ -1,5 +1,6 @@
 [package]
-name = "pratt_pitt"
+name = "acc"
+description = "Academic C Compiler"
 version = "0.1.0"
 edition = "2024"
 
