@@ -569,10 +569,202 @@ fn lower_expr(
                 );
                 result_val
             }
-            BinaryOp::SubtractAssign => todo!(),
-            BinaryOp::MultiplyAssign => todo!(),
-            BinaryOp::DivideAssign => todo!(),
-            BinaryOp::ModulusAssign => todo!(),
+            BinaryOp::SubtractAssign => {
+                let left_ident = if let Expr::Ident(id, _) = &***left {
+                    *id
+                } else {
+                    panic!("Left-hand side of assignment must be an identifier");
+                };
+
+                let left_var_id = if let Some(var_id) = sema.lookup_ref_id(left_ident) {
+                    var_id
+                } else {
+                    panic!(
+                        "Variable {:?} not found in semantic analysis results",
+                        left_ident
+                    );
+                };
+
+                let right_val = lower_expr(builder, bb, right, sema, semantic_errors);
+                let result_val = builder.allocate_value(root.span, Some(left_var_id));
+                let left_val =
+                    builder.allocate_value(sema.var_span(left_var_id), Some(left_var_id));
+                // Load current value of left variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: left_val,
+                        val: RValue::_VarId(left_var_id),
+                    },
+                );
+                // Perform addition
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: result_val,
+                        val: RValue::Sub {
+                            left: left_val,
+                            right: right_val,
+                        },
+                    },
+                );
+                // Store back to variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::_AssignVar {
+                        var_id: left_var_id,
+                        val: RValue::Value(result_val),
+                    },
+                );
+                result_val
+            },
+            BinaryOp::MultiplyAssign => {
+                let left_ident = if let Expr::Ident(id, _) = &***left {
+                    *id
+                } else {
+                    panic!("Left-hand side of assignment must be an identifier");
+                };
+
+                let left_var_id = if let Some(var_id) = sema.lookup_ref_id(left_ident) {
+                    var_id
+                } else {
+                    panic!(
+                        "Variable {:?} not found in semantic analysis results",
+                        left_ident
+                    );
+                };
+
+                let right_val = lower_expr(builder, bb, right, sema, semantic_errors);
+                let result_val = builder.allocate_value(root.span, Some(left_var_id));
+                let left_val =
+                    builder.allocate_value(sema.var_span(left_var_id), Some(left_var_id));
+                // Load current value of left variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: left_val,
+                        val: RValue::_VarId(left_var_id),
+                    },
+                );
+                // Perform addition
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: result_val,
+                        val: RValue::Mul {
+                            left: left_val,
+                            right: right_val,
+                        },
+                    },
+                );
+                // Store back to variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::_AssignVar {
+                        var_id: left_var_id,
+                        val: RValue::Value(result_val),
+                    },
+                );
+                result_val
+            },
+            BinaryOp::DivideAssign => {
+                let left_ident = if let Expr::Ident(id, _) = &***left {
+                    *id
+                } else {
+                    panic!("Left-hand side of assignment must be an identifier");
+                };
+
+                let left_var_id = if let Some(var_id) = sema.lookup_ref_id(left_ident) {
+                    var_id
+                } else {
+                    panic!(
+                        "Variable {:?} not found in semantic analysis results",
+                        left_ident
+                    );
+                };
+
+                let right_val = lower_expr(builder, bb, right, sema, semantic_errors);
+                let result_val = builder.allocate_value(root.span, Some(left_var_id));
+                let left_val =
+                    builder.allocate_value(sema.var_span(left_var_id), Some(left_var_id));
+                // Load current value of left variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: left_val,
+                        val: RValue::_VarId(left_var_id),
+                    },
+                );
+                // Perform addition
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: result_val,
+                        val: RValue::Div {
+                            left: left_val,
+                            right: right_val,
+                        },
+                    },
+                );
+                // Store back to variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::_AssignVar {
+                        var_id: left_var_id,
+                        val: RValue::Value(result_val),
+                    },
+                );
+                result_val
+            },
+            BinaryOp::ModulusAssign => {
+                let left_ident = if let Expr::Ident(id, _) = &***left {
+                    *id
+                } else {
+                    panic!("Left-hand side of assignment must be an identifier");
+                };
+
+                let left_var_id = if let Some(var_id) = sema.lookup_ref_id(left_ident) {
+                    var_id
+                } else {
+                    panic!(
+                        "Variable {:?} not found in semantic analysis results",
+                        left_ident
+                    );
+                };
+
+                let right_val = lower_expr(builder, bb, right, sema, semantic_errors);
+                let result_val = builder.allocate_value(root.span, Some(left_var_id));
+                let left_val =
+                    builder.allocate_value(sema.var_span(left_var_id), Some(left_var_id));
+                // Load current value of left variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: left_val,
+                        val: RValue::_VarId(left_var_id),
+                    },
+                );
+                // Perform addition
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: result_val,
+                        val: RValue::Modulus {
+                            left: left_val,
+                            right: right_val,
+                        },
+                    },
+                );
+                // Store back to variable
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::_AssignVar {
+                        var_id: left_var_id,
+                        val: RValue::Value(result_val),
+                    },
+                );
+                result_val
+            },
             BinaryOp::Equal => {
                 let left_val = lower_expr(builder, bb, left, sema, semantic_errors);
                 let right_val = lower_expr(builder, bb, right, sema, semantic_errors);
