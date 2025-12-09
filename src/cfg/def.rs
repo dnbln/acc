@@ -43,8 +43,6 @@ pub struct PhiCfgInstruction {
 pub enum ValueRefOrConst {
     Value(ValueRef),
     Const(i64),
-    /// Temporary unknown value, used during SSA construction
-    _TempUnknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -89,6 +89,10 @@ impl CfgBuilder {
         self.blocks[bb_id.0].instructions.push(instr);
     }
 
+    pub(super) fn prepend_instruction(&mut self, bb_id: BBId, instr: CfgInstruction) {
+        self.blocks[bb_id.0].instructions.insert(0, instr);
+    }
+
     pub(super) fn bb_has_tail(&self, bb_id: BBId) -> bool {
         self.blocks[bb_id.0].tail != TailCfgInstruction::Undefined
     }

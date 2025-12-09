@@ -74,9 +74,6 @@ impl Display for ValueRefOrConst {
             ValueRefOrConst::Const(c) => {
                 write!(f, "{}", c)
             }
-            ValueRefOrConst::_TempUnknown => {
-                write!(f, "temp_unknown")
-            }
         }
     }
 }
