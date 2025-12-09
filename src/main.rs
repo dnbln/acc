@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 
 use acc::cfg::lower::LowerError;
@@ -23,6 +24,10 @@ struct Args {
     /// Display the CFGs after lowering
     #[clap(long)]
     cfg: bool,
+
+    /// Generate Graphviz DOT files for CFGs after lowering, under directory DIR
+    #[clap(long, value_name = "DIR")]
+    cfg_graphviz: Option<PathBuf>,
 }
 
 pub struct SemaTargetDisplay {
@@ -57,7 +62,7 @@ fn display_cfg_errors(source: impl AsRef<str>, filename: impl AsRef<str>, errors
 fn main() -> Result<()> {
     let args = Args::parse();
     let path = args.path;
-    let source = std::fs::read_to_string(&path).unwrap();
+    let source = fs::read_to_string(&path).unwrap();
 
     let program = match CParser::new(&source) {
         Ok(mut parser) => match parser.parse_program() {
@@ -131,6 +136,29 @@ fn main() -> Result<()> {
 
                 if args.cfg {
                     println!("CFG for function {}:\n{}", *func.name, cfg);
+                }
+
+                if let Some(cfg_graphviz_dir) = &args.cfg_graphviz {
+                    if !cfg_graphviz_dir.exists() {
+                        fs::create_dir_all(cfg_graphviz_dir).map_err(|e| {
+                            anyhow!(
+                                "Failed to create directory {}: {}",
+                                cfg_graphviz_dir.display(),
+                                e
+                            )
+                        })?;
+                    }
+
+                    let dot_output = acc::cfg::display::graphviz(&cfg);
+                    let dot_filename = cfg_graphviz_dir.join(format!("{}.dot", func.name.node));
+                    fs::write(&dot_filename, dot_output).map_err(|e| {
+                        anyhow!(
+                            "Failed to write Graphviz DOT file {}: {}",
+                            dot_filename.display(),
+                            e
+                        )
+                    })?;
+                    println!("Wrote CFG Graphviz DOT file to {}", dot_filename.display());
                 }
             }
             _ => {}

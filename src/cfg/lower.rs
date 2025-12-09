@@ -1720,7 +1720,6 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
 
     loop {
         let mut changed = false;
-        let mut new_live_values = BTreeSet::new();
 
         for bb in &builder.blocks {
             for phi in &bb.phi {
@@ -1728,7 +1727,7 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                     match source {
                         ValueRefOrConst::Value(v) => {
                             if !live_values.contains(v) {
-                                new_live_values.insert(*v);
+                                live_values.insert(*v);
                                 changed = true;
                             }
                         }
@@ -1736,65 +1735,79 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                     }
                 }
             }
-            for instr in &bb.instructions {
+            for instr in bb.instructions.iter().rev() {
                 match instr {
-                    CfgInstruction::Assign { dest: _, val } => match val {
-                        RValue::Value(v) => {
-                            if !live_values.contains(v) {
-                                new_live_values.insert(*v);
+                    CfgInstruction::Assign { dest, val } => {
+                        if matches!(val, RValue::Call { .. }) {
+                            // function calls are assumed to have side effects, so their dest is always live
+                            if !live_values.contains(dest) {
+                                live_values.insert(*dest);
                                 changed = true;
                             }
                         }
-                        RValue::Const(_) => {}
-                        RValue::Add { left, right }
-                        | RValue::Sub { left, right }
-                        | RValue::Mul { left, right }
-                        | RValue::Div { left, right }
-                        | RValue::Modulus { left, right }
-                        | RValue::EqCheck { left, right }
-                        | RValue::NEqCheck { left, right }
-                        | RValue::LtCheck { left, right }
-                        | RValue::GtCheck { left, right }
-                        | RValue::LEqCheck { left, right }
-                        | RValue::GEqCheck { left, right }
-                        | RValue::BitwiseAnd { left, right }
-                        | RValue::BitwiseOr { left, right }
-                        | RValue::BitwiseXor { left, right }
-                        | RValue::BitShiftLeft { left, right }
-                        | RValue::BitShiftRight { left, right } => {
-                            if !live_values.contains(left) {
-                                new_live_values.insert(*left);
-                                changed = true;
-                            }
-                            if !live_values.contains(right) {
-                                new_live_values.insert(*right);
-                                changed = true;
-                            }
+
+                        if !live_values.contains(dest) {
+                            continue;
                         }
-                        RValue::BitwiseNot { expr } => {
-                            if !live_values.contains(expr) {
-                                new_live_values.insert(*expr);
-                                changed = true;
-                            }
-                        }
-                        RValue::Call { func, args } => {
-                            if !live_values.contains(func) {
-                                new_live_values.insert(*func);
-                                changed = true;
-                            }
-                            for arg in args {
-                                if !live_values.contains(arg) {
-                                    new_live_values.insert(*arg);
+
+                        match val {
+                            RValue::Value(v) => {
+                                if !live_values.contains(v) {
+                                    live_values.insert(*v);
                                     changed = true;
                                 }
                             }
+                            RValue::Const(_) => {}
+                            RValue::Add { left, right }
+                            | RValue::Sub { left, right }
+                            | RValue::Mul { left, right }
+                            | RValue::Div { left, right }
+                            | RValue::Modulus { left, right }
+                            | RValue::EqCheck { left, right }
+                            | RValue::NEqCheck { left, right }
+                            | RValue::LtCheck { left, right }
+                            | RValue::GtCheck { left, right }
+                            | RValue::LEqCheck { left, right }
+                            | RValue::GEqCheck { left, right }
+                            | RValue::BitwiseAnd { left, right }
+                            | RValue::BitwiseOr { left, right }
+                            | RValue::BitwiseXor { left, right }
+                            | RValue::BitShiftLeft { left, right }
+                            | RValue::BitShiftRight { left, right } => {
+                                if !live_values.contains(left) {
+                                    live_values.insert(*left);
+                                    changed = true;
+                                }
+                                if !live_values.contains(right) {
+                                    live_values.insert(*right);
+                                    changed = true;
+                                }
+                            }
+                            RValue::BitwiseNot { expr } => {
+                                if !live_values.contains(expr) {
+                                    live_values.insert(*expr);
+                                    changed = true;
+                                }
+                            }
+                            RValue::Call { func, args } => {
+                                if !live_values.contains(func) {
+                                    live_values.insert(*func);
+                                    changed = true;
+                                }
+                                for arg in args {
+                                    if !live_values.contains(arg) {
+                                        live_values.insert(*arg);
+                                        changed = true;
+                                    }
+                                }
+                            }
+                            RValue::_VarId(..) => {
+                                // unreachable!()
+                            }
+                            RValue::Param { param_index } => {}
+                            RValue::Function { name } => {}
                         }
-                        RValue::_VarId(..) => {
-                            // unreachable!()
-                        }
-                        RValue::Param { param_index } => {}
-                        RValue::Function { name } => {}
-                    },
+                    }
                     CfgInstruction::_AssignVar { var_id, val } => {
                         unreachable!()
                     }
@@ -1808,7 +1821,7 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                     else_bb: _,
                 } => {
                     if !live_values.contains(cond) {
-                        new_live_values.insert(*cond);
+                        live_values.insert(*cond);
                         changed = true;
                     }
                 }
@@ -1816,7 +1829,7 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                 TailCfgInstruction::Return { value } => {
                     if let Some(v) = value {
                         if !live_values.contains(v) {
-                            new_live_values.insert(*v);
+                            live_values.insert(*v);
                             changed = true;
                         }
                     }
@@ -1830,8 +1843,6 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
         if !changed {
             break;
         }
-
-        live_values.extend(new_live_values);
     }
 
     live_values
