@@ -158,12 +158,14 @@ fn lower_stmt_to_block(
             then_branch,
             else_branch,
         } => {
-            let exit_bb = builder.create_bb();
             let mut then_bb = builder.create_bb();
-            let mut else_bb = if let Some(_) = else_branch {
-                builder.create_bb()
+            let (exit_bb, mut else_bb) = if let Some(_) = else_branch {
+                let else_bb = builder.create_bb();
+                let exit_bb = builder.create_bb();
+                (exit_bb, else_bb)
             } else {
-                exit_bb
+                let exit_bb = builder.create_bb();
+                (exit_bb, exit_bb)
             };
 
             let cond_val = lower_expr(builder, bb_id, cond, sema, semantic_errors);
