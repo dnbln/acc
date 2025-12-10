@@ -3,11 +3,14 @@
 
 use std::collections::BTreeMap;
 
-use crate::{diagnostics::IntoDiagnostic, parser::{
-    TopLevel,
-    ast::{Expr, Function, Program, RefId, Stmt, VarId},
-    span::{Span, Spanned},
-}};
+use crate::{
+    diagnostics::IntoDiagnostic,
+    parser::{
+        TopLevel,
+        ast::{Expr, Function, Program, RefId, Stmt, VarId},
+        span::{Span, Spanned},
+    },
+};
 
 pub struct SemaResults {
     pub m: BTreeMap<RefId, VarId>,
@@ -55,6 +58,12 @@ impl SemaStack {
 
 pub enum SemaError {
     UndefinedVariable(Spanned<String>, RefId),
+    RedeclaredVariable {
+        new_span: Spanned<String>,
+        old_span: Spanned<String>,
+        new_id: VarId,
+        old_id: VarId,
+    },
 }
 
 impl IntoDiagnostic for SemaError {
@@ -63,17 +72,38 @@ impl IntoDiagnostic for SemaError {
             SemaError::UndefinedVariable(name_span, _ref_id) => {
                 codespan_reporting::diagnostic::Diagnostic::error()
                     .with_message("Undefined variable")
-                    .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
-                        file_id,
-                        name_span.span.range(),
-                    )
-                    .with_message(format!("The variable '{}' is not defined", name_span.node))])
+                    .with_labels(vec![
+                        codespan_reporting::diagnostic::Label::primary(
+                            file_id,
+                            name_span.span.range(),
+                        )
+                        .with_message(format!("The variable '{}' is not defined", name_span.node)),
+                    ])
             }
+            SemaError::RedeclaredVariable {
+                new_span,
+                old_span,
+                new_id: _new_id,
+                old_id: _old_id,
+            } => codespan_reporting::diagnostic::Diagnostic::error()
+                .with_message("Redeclared variable")
+                .with_labels(vec![
+                    codespan_reporting::diagnostic::Label::primary(file_id, new_span.span.range())
+                        .with_message(format!(
+                            "The variable '{}' is redeclared in the same scope",
+                            new_span.node
+                        )),
+                    codespan_reporting::diagnostic::Label::secondary(
+                        file_id,
+                        old_span.span.range(),
+                    )
+                    .with_message(format!("Previous declaration of '{}' here", old_span.node)),
+                ]),
         }
     }
 }
 
-pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> { 
+pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
     let mut sema = SemaResults {
         m: BTreeMap::new(),
         refs: BTreeMap::new(),
@@ -103,7 +133,9 @@ pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
 
     for item in ast.items.iter() {
         match &**item {
-            TopLevel::Function(func, _) => sema_function(func, &mut sema, &mut stack, &mut sema_errors),
+            TopLevel::Function(func, _) => {
+                sema_function(func, &mut sema, &mut stack, &mut sema_errors)
+            }
             TopLevel::GlobalVar { init, .. } => {
                 // Global variables are already handled in the top-level scope
                 if let Some(init) = init {
@@ -122,7 +154,12 @@ pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
     }
 }
 
-fn sema_function(ast: &Function, sema: &mut SemaResults, stack: &mut SemaStack, sema_errors: &mut Vec<SemaError>) {
+fn sema_function(
+    ast: &Function,
+    sema: &mut SemaResults,
+    stack: &mut SemaStack,
+    sema_errors: &mut Vec<SemaError>,
+) {
     {
         let mut base_frame = SemaStackFrame {
             vars: BTreeMap::new(),
@@ -161,12 +198,22 @@ fn sema_stmt(
             if let Some(init_expr) = init {
                 sema_expr(init_expr, sema, stack, sema_errors);
             }
-            stack
+            let prev = stack
                 .frames
                 .last_mut()
                 .unwrap()
                 .vars
                 .insert(name.node.clone(), *id);
+
+            if let Some(prev_id) = prev {
+                sema_errors.push(SemaError::RedeclaredVariable {
+                    new_span: name.clone(),
+                    old_span: Spanned::new(name.node.clone(), sema.var_span(prev_id)),
+                    new_id: *id,
+                    old_id: prev_id,
+                });
+            }
+
             sema.add_declaration(*id, name.span);
         }
         Stmt::Expr(spanned) => {

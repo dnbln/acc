@@ -1,0 +1,71 @@
+STDOUT:
+CFG for function main:
+BBId(0): % preds = []
+  %0 = function main
+  br BBId(1)
+
+BBId(1): % preds = [BBId(0), BBId(3)]
+  %13 = Φ(0@BB0, %13@BB3)
+  %14 = Φ(0@BB0, %11@BB3)
+  %15 = Φ(%0@BB0, %15@BB3)
+  %4 = const 10
+  %5 = lt %14, %4
+  br_cond %5 ? BBId(2) : BBId(4)
+
+BBId(2): % preds = [BBId(1)]
+  %6 = const 1
+  %7 = add %14, %6
+  br BBId(3)
+
+BBId(3): % preds = [BBId(2)]
+  %10 = const 1
+  %11 = add %7, %10
+  br BBId(1)
+
+BBId(4): % preds = [BBId(1)]
+  return %13
+
+
+
+STDERR:
+note: Name resolution
+  ┌─ tests/for_shadows_outer_variables.c:4:18
+  │
+3 │     int i = 0;
+  │         - Resolved to VarId(0)
+4 │     for (int i = i; i < 10; i++) {
+  │                  ^ Ref at RefId(0)
+
+note: Name resolution
+  ┌─ tests/for_shadows_outer_variables.c:4:21
+  │
+4 │     for (int i = i; i < 10; i++) {
+  │              -      ^ Ref at RefId(1)
+  │              │       
+  │              Resolved to VarId(1)
+
+note: Name resolution
+  ┌─ tests/for_shadows_outer_variables.c:4:29
+  │
+4 │     for (int i = i; i < 10; i++) {
+  │              -              ^ Ref at RefId(2)
+  │              │               
+  │              Resolved to VarId(1)
+
+note: Name resolution
+  ┌─ tests/for_shadows_outer_variables.c:5:9
+  │
+4 │     for (int i = i; i < 10; i++) {
+  │              - Resolved to VarId(1)
+5 │         i += 1;
+  │         ^ Ref at RefId(3)
+
+note: Name resolution
+  ┌─ tests/for_shadows_outer_variables.c:7:12
+  │
+3 │     int i = 0;
+  │         - Resolved to VarId(0)
+  ·
+7 │     return i;
+  │            ^ Ref at RefId(4)
+

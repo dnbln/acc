@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: Undefined variable
+  ┌─ tests/bad_ref_self_in_initializer.c:3:13
+  │
+3 │     int x = x;
+  │             ^ The variable 'x' is not defined
+
+Error: Semantic analysis failed

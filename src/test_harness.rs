@@ -70,7 +70,7 @@ fn run_test_case(
                     String::from_utf8_lossy(&output.stderr)
                 );
             }
-            ExpectFailInfo::Yes => return Ok(()),
+            ExpectFailInfo::Yes => {}
             ExpectFailInfo::YesWithMessage(ref msg) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 if !stderr.contains(msg) {
@@ -80,8 +80,6 @@ fn run_test_case(
                         msg,
                         stderr
                     );
-                } else {
-                    return Ok(());
                 }
             }
         }
