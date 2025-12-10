@@ -7,7 +7,7 @@ use crate::{
     diagnostics::IntoDiagnostic,
     parser::{
         TopLevel,
-        ast::{Expr, Function, Program, RefId, Stmt, VarId},
+        ast::{Block, Expr, Function, Program, RefId, Stmt, VarId},
         span::{Span, Spanned},
     },
 };
@@ -172,11 +172,27 @@ fn sema_function(
     }
 
     if let Some(body) = &ast.body {
-        sema_stmt(body, sema, stack, sema_errors);
+        sema_block(body, sema, stack, sema_errors);
     }
 
     stack.frames.pop();
 }
+
+fn sema_block(
+    block: &Spanned<Block>,
+    sema: &mut SemaResults,
+    stack: &mut SemaStack,
+    sema_errors: &mut Vec<SemaError>,
+) {
+    stack.frames.push(SemaStackFrame {
+        vars: BTreeMap::new(),
+    });
+    for stmt in &block.node.stmts {
+        sema_stmt(stmt, sema, stack, sema_errors);
+    }
+    stack.frames.pop();
+}
+
 fn sema_stmt(
     stmt: &Spanned<Stmt>,
     sema: &mut SemaResults,
@@ -184,14 +200,8 @@ fn sema_stmt(
     sema_errors: &mut Vec<SemaError>,
 ) {
     match &**stmt {
-        Stmt::Block(stmts) => {
-            stack.frames.push(SemaStackFrame {
-                vars: BTreeMap::new(),
-            });
-            for s in stmts {
-                sema_stmt(&s, sema, stack, sema_errors);
-            }
-            stack.frames.pop();
+        Stmt::Block(block) => {
+            sema_block(block, sema, stack, sema_errors);
         }
         Stmt::VarDecl { id, name, init, .. } => {
             // first sema the initializer expression (if any), so that we cannot reference ourselves in the initializer
@@ -225,9 +235,9 @@ fn sema_stmt(
             else_branch,
         } => {
             sema_expr(cond, sema, stack, sema_errors);
-            sema_stmt(then_branch, sema, stack, sema_errors);
+            sema_block(then_branch, sema, stack, sema_errors);
             if let Some(else_branch) = else_branch {
-                sema_stmt(else_branch, sema, stack, sema_errors);
+                sema_block(else_branch, sema, stack, sema_errors);
             }
         }
         Stmt::While { cond, body } => {

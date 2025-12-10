@@ -11,7 +11,7 @@ use crate::{
     diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
     parser::{
         Expr, Function, Stmt,
-        ast::VarId,
+        ast::{Block, VarId},
         operator::{BinaryOp, UnaryOp},
         span::{Span, Spanned},
     },
@@ -110,7 +110,7 @@ pub fn lower_ast_to_cfg(
     }
     let mut semantic_errors = Vec::new();
 
-    lower_stmt_to_block(
+    lower_block_to_block(
         &mut builder,
         &mut bb,
         None,
@@ -147,6 +147,20 @@ pub fn lower_ast_to_cfg(
     }
 }
 
+fn lower_block_to_block(
+    builder: &mut CfgBuilder,
+    bb_id: &mut BBId,
+    cf_loop: Option<ControlFlowLoopRefs>,
+    block: &Spanned<Block>,
+    sema: &SemaResults,
+    semantic_errors: &mut Vec<SemanticError>,
+    warnings: &mut Vec<CfgWarning>,
+) {
+    for stmt in &block.node.stmts {
+        lower_stmt_to_block(builder, bb_id, cf_loop, stmt, sema, semantic_errors, warnings);
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct ControlFlowLoopRefs {
     /// BB to jump to on continue
@@ -175,10 +189,16 @@ fn lower_stmt_to_block(
         Stmt::Expr(spanned) => {
             lower_expr(builder, bb_id, spanned, sema, semantic_errors);
         }
-        Stmt::Block(spanneds) => {
-            for s in spanneds {
-                lower_stmt_to_block(builder, bb_id, cf_loop, s, sema, semantic_errors, warnings);
-            }
+        Stmt::Block(block) => {
+            lower_block_to_block(
+                builder,
+                bb_id,
+                cf_loop,
+                block,
+                sema,
+                semantic_errors,
+                warnings,
+            );
         }
         Stmt::If {
             cond,
@@ -205,7 +225,7 @@ fn lower_stmt_to_block(
                 },
             );
             // Lower then branch
-            lower_stmt_to_block(
+            lower_block_to_block(
                 builder,
                 &mut then_bb,
                 cf_loop,
@@ -222,7 +242,7 @@ fn lower_stmt_to_block(
             }
             // Lower else branch
             if let Some(else_branch) = else_branch {
-                lower_stmt_to_block(
+                lower_block_to_block(
                     builder,
                     &mut else_bb,
                     cf_loop,

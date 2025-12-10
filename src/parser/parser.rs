@@ -1,4 +1,4 @@
-use crate::parser::ast::{Program, RefId, VarId};
+use crate::parser::ast::{Block, Program, RefId, VarId};
 use crate::parser::span::Span;
 
 use super::ast::{Expr, Function, Stmt, TopLevel, Type};
@@ -389,7 +389,12 @@ impl Parser {
         let start = self.current_span().start;
 
         let stmt = match self.peek_kind() {
-            TokenKind::LBrace => return self.parse_block(),
+            TokenKind::LBrace => {
+                return self.parse_block().map(|b| {
+                    let span = b.span;
+                    Spanned::new(Stmt::Block(b), span)
+                });
+            }
             TokenKind::If => return self.parse_if(),
             TokenKind::While => return self.parse_while(),
             TokenKind::For => return self.parse_for(),
@@ -416,7 +421,7 @@ impl Parser {
         Ok(Spanned::new(stmt, span))
     }
 
-    fn parse_block(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_block(&mut self) -> ParseResult<Spanned<Block>> {
         let current = self.current_span();
         let lbrace = self.expect(TokenKind::LBrace)?;
         let mut stmts = Vec::new();
@@ -437,7 +442,7 @@ impl Parser {
 
         self.expect(TokenKind::RBrace)?;
         let span = self.span_from(current.start);
-        Ok(Spanned::new(Stmt::Block(stmts), span))
+        Ok(Spanned::new(Block { stmts }, span))
     }
 
     fn parse_if(&mut self) -> ParseResult<Spanned<Stmt>> {
@@ -457,11 +462,11 @@ impl Parser {
         }
         self.expect(TokenKind::RParen)?;
 
-        let then_branch = Box::new(self.parse_stmt()?);
+        let then_branch = self.parse_block()?;
 
         let else_branch = if self.next_is(&TokenKind::Else) {
             self.advance();
-            Some(Box::new(self.parse_stmt()?))
+            Some(self.parse_block()?)
         } else {
             None
         };

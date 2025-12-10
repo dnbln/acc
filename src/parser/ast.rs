@@ -43,14 +43,19 @@ pub enum Expr {
 pub struct VarId(pub(super) usize);
 
 #[derive(Debug, Clone)]
+pub struct Block {
+    pub stmts: Vec<Spanned<Stmt>>,
+}
+
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Stmt {
     Expr(Spanned<Expr>),
-    Block(Vec<Spanned<Stmt>>),
+    Block(Spanned<Block>),
     If {
         cond: Spanned<Expr>,
-        then_branch: Box<Spanned<Stmt>>,
-        else_branch: Option<Box<Spanned<Stmt>>>,
+        then_branch: Spanned<Block>,
+        else_branch: Option<Spanned<Block>>,
     },
     While {
         cond: Spanned<Expr>,
@@ -79,7 +84,7 @@ pub struct Function {
     pub return_type: Spanned<Type>,
     pub name: Spanned<String>,
     pub params: Vec<(Spanned<Type>, Spanned<String>, VarId)>,
-    pub body: Option<Spanned<Stmt>>,
+    pub body: Option<Spanned<Block>>,
 }
 
 #[derive(Debug, Clone)]

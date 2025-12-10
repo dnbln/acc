@@ -7,8 +7,8 @@ Return Type: Spanned {
 }
 Body: Some(
     Spanned {
-        node: Block(
-            [
+        node: Block {
+            stmts: [
                 Spanned {
                     node: While {
                         cond: Spanned {
@@ -19,7 +19,12 @@ Body: Some(
                         },
                         body: Spanned {
                             node: Block(
-                                [],
+                                Spanned {
+                                    node: Block {
+                                        stmts: [],
+                                    },
+                                    span: 48..50,
+                                },
                             ),
                             span: 48..50,
                         },
@@ -40,7 +45,7 @@ Body: Some(
                     span: 55..64,
                 },
             ],
-        ),
+        },
         span: 32..66,
     },
 )
