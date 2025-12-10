@@ -19,15 +19,34 @@ fn run_test_case(
 
     let test_file = std::fs::read_to_string(input_path).unwrap();
     let mut args = Vec::new();
-    let mut expect_fail = false;
+
+    enum ExpectFailInfo {
+        No,
+        Yes,
+        YesWithMessage(String),
+    }
+
+    impl ExpectFailInfo {
+        fn is_yes(&self) -> bool {
+            matches!(
+                self,
+                ExpectFailInfo::Yes | ExpectFailInfo::YesWithMessage(_)
+            )
+        }
+    }
+
+    let mut expect_fail = ExpectFailInfo::No;
     for line in test_file
         .lines()
         .take_while(|it| it.trim().starts_with("//@"))
+        .filter_map(|it| it.trim().strip_prefix("//@"))
     {
-        if let Some(rest) = line.trim().strip_prefix("//@FAIL") {
-            expect_fail = true;
+        if let Some(rest) = line.trim().strip_prefix("FAIL: ") {
+            expect_fail = ExpectFailInfo::YesWithMessage(rest.to_string());
+        } else if line.trim().starts_with("FAIL") {
+            expect_fail = ExpectFailInfo::Yes;
         }
-        if let Some(rest) = line.trim().strip_prefix("//@ARGS: ") {
+        if let Some(rest) = line.trim().strip_prefix("ARGS: ") {
             args.extend(rest.split_whitespace());
         }
     }
@@ -42,13 +61,31 @@ fn run_test_case(
         .expect("Failed to execute test case");
 
     let failed = !output.status.success();
-    if failed && !expect_fail {
-        bail!(
-            "Test case '{}' failed to execute.\nStderr:\n{}",
-            test_name,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    } else if !failed && expect_fail {
+    if failed {
+        match expect_fail {
+            ExpectFailInfo::No => {
+                bail!(
+                    "Test case '{}' failed to execute.\nStderr:\n{}",
+                    test_name,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            ExpectFailInfo::Yes => return Ok(()),
+            ExpectFailInfo::YesWithMessage(ref msg) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if !stderr.contains(msg) {
+                    bail!(
+                        "Test case '{}' failed, but error message did not match.\nExpected to find: '{}'\nActual stderr:\n{}",
+                        test_name,
+                        msg,
+                        stderr
+                    );
+                } else {
+                    return Ok(());
+                }
+            }
+        }
+    } else if !failed && expect_fail.is_yes() {
         bail!(
             "Test case '{}' was expected to fail but succeeded.\nStdout:\n{}",
             test_name,
