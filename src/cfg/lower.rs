@@ -1291,67 +1291,6 @@ fn lower_expr(
 }
 
 fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
-    fn compute_dominated_bbs(bb: BBId, builder: &CfgBuilder, dominated: &mut BTreeSet<BBId>) {
-        for succ in &builder.blocks[bb.0].successors {
-            if !dominated.contains(succ) {
-                if builder.blocks[succ.0]
-                    .predecessors
-                    .iter()
-                    .all(|pred| dominated.contains(pred))
-                {
-                    dominated.insert(*succ);
-                    compute_dominated_bbs(*succ, builder, dominated);
-                }
-            }
-        }
-    }
-
-    fn dominance_frontier(
-        builder: &CfgBuilder,
-        dominated: &BTreeSet<BBId>,
-    ) -> BTreeSet<(BBId, BTreeSet<BBId>, BTreeSet<BBId>)> {
-        let mut frontier = BTreeSet::new();
-        for d in dominated {
-            for succ in &builder.blocks[d.0].successors {
-                if builder.blocks[succ.0]
-                    .predecessors
-                    .iter()
-                    .any(|pred| !dominated.contains(pred))
-                {
-                    frontier.insert((
-                        *succ,
-                        builder.blocks[succ.0]
-                            .predecessors
-                            .iter()
-                            .filter(|pred| dominated.contains(pred))
-                            .cloned()
-                            .collect::<BTreeSet<BBId>>(),
-                        builder.blocks[succ.0]
-                            .predecessors
-                            .iter()
-                            .filter(|pred| !dominated.contains(pred))
-                            .cloned()
-                            .collect::<BTreeSet<BBId>>(),
-                    ));
-                }
-            }
-        }
-        frontier
-    }
-
-    let mut dom = BTreeMap::<BBId, BTreeSet<BBId>>::new();
-    let mut frontier = BTreeMap::<BBId, BTreeSet<(BBId, BTreeSet<BBId>, BTreeSet<BBId>)>>::new();
-    for bb_id in 0..builder.blocks.len() {
-        let mut dominated = BTreeSet::new();
-        dominated.insert(BBId(bb_id));
-        compute_dominated_bbs(BBId(bb_id), builder, &mut dominated);
-        // println!("{:?} dominates: {:?}", BBId(bb_id), dominated);
-        dom.insert(BBId(bb_id), dominated);
-        let df = dominance_frontier(builder, &dom[&BBId(bb_id)]);
-        // println!("{:?} dominance frontier: {:?}", BBId(bb_id), df);
-        frontier.insert(BBId(bb_id), df);
-    }
-
     let mut before_vars: BTreeMap<VarId, BTreeMap<BBId, ValueRef>> = BTreeMap::new();
     let mut after_vars: BTreeMap<VarId, BTreeMap<BBId, ValueRef>> = BTreeMap::new();
     let mut phis: BTreeMap<BBId, BTreeMap<VarId, BTreeMap<BBId, ValueRefOrConst>>> =
@@ -1484,10 +1423,10 @@ fn assignment_removal(builder: &mut CfgBuilder) {
 }
 
 #[derive(Debug)]
-struct SingleMalformedPhiInfo {
-    bb_id: BBId,
-    phi_var_id: Option<VarId>,
-    sources: BTreeMap<BBId, ValueRefOrConst>,
+pub struct SingleMalformedPhiInfo {
+    pub bb_id: BBId,
+    pub phi_var_id: Option<VarId>,
+    pub sources: BTreeMap<BBId, ValueRefOrConst>,
 }
 
 #[derive(Debug)]
@@ -1528,7 +1467,7 @@ impl SemanticsAwareIntoDiagnostic for SingleMalformedAssignmentInfo {
 
 #[derive(Debug)]
 pub struct MalformedPhiInfo {
-    infos: Vec<SingleMalformedPhiInfo>,
+    pub infos: Vec<SingleMalformedPhiInfo>,
     pub malformed_assignments: Vec<SingleMalformedAssignmentInfo>,
 }
 
@@ -1736,8 +1675,8 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                         }
                     }
                     RValue::Const(_) => {}
-                    RValue::Param { param_index } => {}
-                    RValue::Function { name } => {}
+                    RValue::Param { .. } => {}
+                    RValue::Function { .. } => {}
                     RValue::_VarId(_) => {}
                     RValue::BitwiseNot { expr } => {
                         let mut current_expr = *expr;
@@ -1879,11 +1818,11 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                             RValue::_VarId(..) => {
                                 // unreachable!()
                             }
-                            RValue::Param { param_index } => {}
-                            RValue::Function { name } => {}
+                            RValue::Param { .. } => {}
+                            RValue::Function { .. } => {}
                         }
                     }
-                    CfgInstruction::_AssignVar { var_id, val } => {
+                    CfgInstruction::_AssignVar { .. } => {
                         unreachable!()
                     }
                 }

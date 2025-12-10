@@ -300,8 +300,7 @@ impl Parser {
             TokenKind::Ident(name) => {
                 let name = name.clone();
                 self.advance();
-                let ref_id = self.ref_counter;
-                self.ref_counter.0 += 1;
+                let ref_id = self.allocate_ref_id();
                 Ok(Spanned::new(Expr::Ident(ref_id, name), tok.span))
             }
             TokenKind::LParen => {

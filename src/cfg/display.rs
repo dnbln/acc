@@ -9,12 +9,12 @@ impl Display for ControlFlowGraph {
         for bb in &self.basic_blocks {
             writeln!(f, "{:?}: % preds = {:?}", bb.id, bb.predecessors)?;
             for phi in &bb.phi {
-                write!(f, "  {} = phi(", phi.dest)?;
+                write!(f, "  {} = Φ(", phi.dest)?;
                 for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "[ from {:?}: {} ]", pred_bb, val)?;
+                    write!(f, "{val}@BB{}", pred_bb.0)?;
                 }
                 writeln!(f, ")")?;
             }
@@ -185,7 +185,7 @@ pub fn graphviz(cfg: &ControlFlowGraph) -> String {
             let mut s = String::new();
             writeln!(&mut s, "BB{}:", bb.id.0).unwrap();
             for phi in &bb.phi {
-                write!(&mut s, "  {} = φ(", phi.dest).unwrap();
+                write!(&mut s, "  {} = Φ(", phi.dest).unwrap();
                 for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
                     if i > 0 {
                         write!(&mut s, ", ").unwrap();

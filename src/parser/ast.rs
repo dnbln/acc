@@ -42,12 +42,6 @@ pub enum Expr {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VarId(pub(super) usize);
 
-impl VarId {
-    pub(crate) fn get_id(&self) -> usize {
-        self.0
-    }
-}
-
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Stmt {
