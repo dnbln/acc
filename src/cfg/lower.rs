@@ -8,7 +8,7 @@ use crate::{
         def::*,
         sema::SemaResults,
     },
-    diagnostics::IntoDiagnostic,
+    diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
     parser::{
         Expr, Function, Stmt,
         ast::VarId,
@@ -52,6 +52,7 @@ pub enum LowerError {
 }
 
 pub fn lower_ast_to_cfg(
+    program: &Vec<Spanned<crate::parser::TopLevel>>,
     ast: &Function,
     sema: &SemaResults,
     warnings: &mut Vec<CfgWarning>,
@@ -64,6 +65,32 @@ pub fn lower_ast_to_cfg(
 
     let entry = builder.create_bb();
     let mut bb = entry;
+
+    for def in program {
+        match &**def {
+            crate::parser::TopLevel::GlobalVar { .. } => {}
+            crate::parser::TopLevel::Function(f, var) => {
+                let v = builder.allocate_value(def.span, Some(*var));
+                builder.add_instruction(
+                    entry,
+                    CfgInstruction::Assign {
+                        dest: v,
+                        val: RValue::Function {
+                            name: f.name.node.clone(),
+                        },
+                    },
+                );
+                builder.add_instruction(
+                    entry,
+                    CfgInstruction::_AssignVar {
+                        var_id: *var,
+                        val: RValue::Value(v),
+                    },
+                );
+            }
+        }
+    }
+
     for (param_index, (_, _, var_id)) in ast.params.iter().enumerate() {
         let v = builder.allocate_value(sema.var_span(*var_id), Some(*var_id));
         builder.add_instruction(
@@ -1470,24 +1497,31 @@ pub struct SingleMalformedAssignmentInfo {
     pub assigned_val: RValue,
 }
 
-impl IntoDiagnostic for SingleMalformedAssignmentInfo {
-    fn to_diagnostic(&self, file_id: usize) -> Diagnostic<usize> {
+impl SemanticsAwareIntoDiagnostic for SingleMalformedAssignmentInfo {
+    fn to_diagnostic_with_sema(&self, file_id: usize, sema: &SemaResults) -> Diagnostic<usize> {
+        let (decl_site, prim_label_text, note_text) = match &self.assigned_val {
+            RValue::Value(v) => (
+                v.1.range(),
+                "value not valid due to prior malformed phi",
+                "note: this means that there are assignments to this variable, but not on all possible code paths",
+            ),
+            RValue::_VarId(v) => (
+                sema.var_span(*v).range(),
+                "value not valid (not yet initialized)",
+                "note: this means that you are trying to use a variable that has not been assigned a value yet",
+            ),
+            _ => unreachable!(),
+        };
+
         let diag = Diagnostic::error()
-            .with_message("Malformed assignment detected during CFG lowering")
+            .with_message("Use before initialization detected during CFG lowering")
             .with_label(
-                Label::primary(file_id, self.dest_val.1.range())
-                    .with_message("Destination of assignment"),
+                Label::primary(file_id, self.dest_val.1.range()).with_message(prim_label_text),
             )
             .with_label(
-                Label::secondary(
-                    file_id,
-                    match &self.assigned_val {
-                        RValue::Value(v) => v.1.range(),
-                        _ => self.dest_val.1.range(),
-                    },
-                )
-                .with_message("Assigned value is malformed"),
-            );
+                Label::secondary(file_id, decl_site).with_message("Variable declaration site"),
+            )
+            .with_note(note_text);
         diag
     }
 }
@@ -1532,6 +1566,7 @@ fn malformed_phi_reduction(builder: &mut CfgBuilder) -> MalformedPhiInfo {
                     if let CfgInstruction::Assign { dest: _, val } = instr {
                         match val {
                             RValue::Value(v) => removed_vals.contains(v),
+                            RValue::_VarId(_) => true,
                             _ => false,
                         }
                     } else {
@@ -1541,7 +1576,14 @@ fn malformed_phi_reduction(builder: &mut CfgBuilder) -> MalformedPhiInfo {
                 .collect::<Vec<_>>();
             for instr in malformed_instrs {
                 removed_vals.insert(match instr {
-                    CfgInstruction::Assign { dest, val: _ } => dest,
+                    CfgInstruction::Assign {
+                        dest,
+                        val: RValue::Value(_),
+                    } => dest,
+                    CfgInstruction::Assign {
+                        dest,
+                        val: RValue::_VarId(_),
+                    } => dest,
                     _ => unreachable!(),
                 });
                 if let CfgInstruction::Assign { dest, val } = instr {
@@ -1708,6 +1750,39 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                         }
                     }
                 }
+            }
+        }
+
+        match &mut bb.tail {
+            TailCfgInstruction::CondBranch {
+                cond,
+                then_bb: _,
+                else_bb: _,
+            } => {
+                let mut current = *cond;
+                while let Some(next) = equalities.get(&current) {
+                    current = *next;
+                }
+                if cond != &current {
+                    *cond = current;
+                    changed = true;
+                }
+            }
+            TailCfgInstruction::UncondBranch { target: _ } => {}
+            TailCfgInstruction::Return { value } => {
+                if let Some(v) = value {
+                    let mut current = *v;
+                    while let Some(next) = equalities.get(&current) {
+                        current = *next;
+                    }
+                    if v != &current {
+                        *v = current;
+                        changed = true;
+                    }
+                }
+            }
+            TailCfgInstruction::Undefined => {
+                unreachable!()
             }
         }
     }

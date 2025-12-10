@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use acc::cfg::lower::LowerError;
 use acc::cfg::sema;
-use acc::diagnostics::{IntoDiagnostic, show_diagnostics};
+use acc::diagnostics::{IntoDiagnostic, show_diagnostics, show_diagnostics_with_sema};
 use acc::parser::ast::{RefId, VarId};
 use acc::parser::{Parser as CParser, TopLevel};
 use anyhow::{Result, anyhow, bail};
@@ -50,10 +50,15 @@ impl IntoDiagnostic for SemaTargetDisplay {
     }
 }
 
-fn display_cfg_errors(source: impl AsRef<str>, filename: impl AsRef<str>, errors: &LowerError) {
+fn display_cfg_errors(
+    source: impl AsRef<str>,
+    filename: impl AsRef<str>,
+    errors: &LowerError,
+    sema: &sema::SemaResults,
+) {
     match errors {
         LowerError::MalformedPhiInfo(infos) => {
-            show_diagnostics(source, filename, &infos.malformed_assignments);
+            show_diagnostics_with_sema(source, filename, &infos.malformed_assignments, sema);
         }
         _ => {}
     }
@@ -123,12 +128,12 @@ fn main() -> Result<()> {
     for top_level in &program.items {
         match &**top_level {
             TopLevel::Function(func, _) => {
-                let cfg = match acc::cfg::lower::lower_ast_to_cfg(func, &sema, &mut warnings) {
+                let cfg = match acc::cfg::lower::lower_ast_to_cfg(&program.items, func, &sema, &mut warnings) {
                     Ok(cfg) => cfg,
                     Err(error) => {
                         eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
 
-                        display_cfg_errors(&source, path.to_string_lossy(), &error);
+                        display_cfg_errors(&source, path.to_string_lossy(), &error, &sema);
 
                         bail!("CFG lowering failed");
                     }
