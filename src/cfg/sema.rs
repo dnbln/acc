@@ -156,7 +156,11 @@ fn sema_stmt(
             }
             stack.frames.pop();
         }
-        Stmt::VarDecl { id, name, .. } => {
+        Stmt::VarDecl { id, name, init, .. } => {
+            // first sema the initializer expression (if any), so that we cannot reference ourselves in the initializer
+            if let Some(init_expr) = init {
+                sema_expr(init_expr, sema, stack, sema_errors);
+            }
             stack
                 .frames
                 .last_mut()
