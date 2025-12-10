@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: expected identifier
+  ┌─ tests/expected_identifier.c:3:9
+  │
+3 │     int 123bad = 10;
+  │         ^^^ expected identifier, found integer literal
+
+Error: Parsing failed

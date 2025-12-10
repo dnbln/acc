@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: unexpected token
+  ┌─ tests/missing_semicolon.c:4:5
+  │
+4 │     return 0;
+  │     ^^^^^^ expected ';', found 'return'
+
+Error: Parsing failed

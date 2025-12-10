@@ -1,0 +1,643 @@
+STDOUT:
+Parsed function: factorial
+Parameters: [
+    (
+        Spanned {
+            node: Int,
+            span: 45..48,
+        },
+        Spanned {
+            node: "n",
+            span: 49..50,
+        },
+        VarId(
+            0,
+        ),
+    ),
+]
+Return Type: Spanned {
+    node: Int,
+    span: 31..34,
+}
+Body: Some(
+    Spanned {
+        node: Block(
+            [
+                Spanned {
+                    node: If {
+                        cond: Spanned {
+                            node: BinOp {
+                                op: Spanned {
+                                    node: LessThanOrEqual,
+                                    span: 62..64,
+                                },
+                                left: Spanned {
+                                    node: Ident(
+                                        RefId(
+                                            0,
+                                        ),
+                                        "n",
+                                    ),
+                                    span: 60..61,
+                                },
+                                right: Spanned {
+                                    node: IntLit(
+                                        1,
+                                    ),
+                                    span: 65..66,
+                                },
+                            },
+                            span: 60..66,
+                        },
+                        then_branch: Spanned {
+                            node: Block(
+                                [
+                                    Spanned {
+                                        node: Return(
+                                            Some(
+                                                Spanned {
+                                                    node: IntLit(
+                                                        1,
+                                                    ),
+                                                    span: 81..82,
+                                                },
+                                            ),
+                                        ),
+                                        span: 74..83,
+                                    },
+                                ],
+                            ),
+                            span: 68..87,
+                        },
+                        else_branch: None,
+                    },
+                    span: 56..87,
+                },
+                Spanned {
+                    node: Return(
+                        Some(
+                            Spanned {
+                                node: BinOp {
+                                    op: Spanned {
+                                        node: Multiply,
+                                        span: 99..100,
+                                    },
+                                    left: Spanned {
+                                        node: Ident(
+                                            RefId(
+                                                1,
+                                            ),
+                                            "n",
+                                        ),
+                                        span: 97..98,
+                                    },
+                                    right: Spanned {
+                                        node: Call {
+                                            func: Spanned {
+                                                node: Ident(
+                                                    RefId(
+                                                        2,
+                                                    ),
+                                                    "factorial",
+                                                ),
+                                                span: 101..110,
+                                            },
+                                            args: [
+                                                Spanned {
+                                                    node: BinOp {
+                                                        op: Spanned {
+                                                            node: Subtract,
+                                                            span: 113..114,
+                                                        },
+                                                        left: Spanned {
+                                                            node: Ident(
+                                                                RefId(
+                                                                    3,
+                                                                ),
+                                                                "n",
+                                                            ),
+                                                            span: 111..112,
+                                                        },
+                                                        right: Spanned {
+                                                            node: IntLit(
+                                                                1,
+                                                            ),
+                                                            span: 115..116,
+                                                        },
+                                                    },
+                                                    span: 111..116,
+                                                },
+                                            ],
+                                        },
+                                        span: 101..117,
+                                    },
+                                },
+                                span: 97..117,
+                            },
+                        ),
+                    ),
+                    span: 90..118,
+                },
+            ],
+        ),
+        span: 52..120,
+    },
+)
+Parsed function: main
+Parameters: []
+Return Type: Spanned {
+    node: Int,
+    span: 122..125,
+}
+Body: Some(
+    Spanned {
+        node: Block(
+            [
+                Spanned {
+                    node: VarDecl {
+                        id: VarId(
+                            2,
+                        ),
+                        ty: Spanned {
+                            node: Int,
+                            span: 137..140,
+                        },
+                        name: Spanned {
+                            node: "x",
+                            span: 141..142,
+                        },
+                        init: Some(
+                            Spanned {
+                                node: IntLit(
+                                    0,
+                                ),
+                                span: 145..146,
+                            },
+                        ),
+                    },
+                    span: 137..147,
+                },
+                Spanned {
+                    node: VarDecl {
+                        id: VarId(
+                            3,
+                        ),
+                        ty: Spanned {
+                            node: Int,
+                            span: 150..153,
+                        },
+                        name: Spanned {
+                            node: "result",
+                            span: 154..160,
+                        },
+                        init: None,
+                    },
+                    span: 150..161,
+                },
+                Spanned {
+                    node: If {
+                        cond: Spanned {
+                            node: BinOp {
+                                op: Spanned {
+                                    node: LessThan,
+                                    span: 171..172,
+                                },
+                                left: Spanned {
+                                    node: Ident(
+                                        RefId(
+                                            4,
+                                        ),
+                                        "x",
+                                    ),
+                                    span: 169..170,
+                                },
+                                right: Spanned {
+                                    node: IntLit(
+                                        10,
+                                    ),
+                                    span: 173..175,
+                                },
+                            },
+                            span: 169..175,
+                        },
+                        then_branch: Spanned {
+                            node: Block(
+                                [
+                                    Spanned {
+                                        node: Expr(
+                                            Spanned {
+                                                node: BinOp {
+                                                    op: Spanned {
+                                                        node: Assign,
+                                                        span: 190..191,
+                                                    },
+                                                    left: Spanned {
+                                                        node: Ident(
+                                                            RefId(
+                                                                5,
+                                                            ),
+                                                            "result",
+                                                        ),
+                                                        span: 183..189,
+                                                    },
+                                                    right: Spanned {
+                                                        node: IntLit(
+                                                            2,
+                                                        ),
+                                                        span: 192..193,
+                                                    },
+                                                },
+                                                span: 183..193,
+                                            },
+                                        ),
+                                        span: 183..194,
+                                    },
+                                ],
+                            ),
+                            span: 177..198,
+                        },
+                        else_branch: Some(
+                            Spanned {
+                                node: Block(
+                                    [
+                                        Spanned {
+                                            node: Expr(
+                                                Spanned {
+                                                    node: BinOp {
+                                                        op: Spanned {
+                                                            node: Assign,
+                                                            span: 217..218,
+                                                        },
+                                                        left: Spanned {
+                                                            node: Ident(
+                                                                RefId(
+                                                                    6,
+                                                                ),
+                                                                "result",
+                                                            ),
+                                                            span: 210..216,
+                                                        },
+                                                        right: Spanned {
+                                                            node: IntLit(
+                                                                3,
+                                                            ),
+                                                            span: 219..220,
+                                                        },
+                                                    },
+                                                    span: 210..220,
+                                                },
+                                            ),
+                                            span: 210..221,
+                                        },
+                                    ],
+                                ),
+                                span: 204..225,
+                            },
+                        ),
+                    },
+                    span: 165..225,
+                },
+                Spanned {
+                    node: For {
+                        init: Some(
+                            Spanned {
+                                node: VarDecl {
+                                    id: VarId(
+                                        4,
+                                    ),
+                                    ty: Spanned {
+                                        node: Int,
+                                        span: 234..237,
+                                    },
+                                    name: Spanned {
+                                        node: "i",
+                                        span: 238..239,
+                                    },
+                                    init: Some(
+                                        Spanned {
+                                            node: IntLit(
+                                                0,
+                                            ),
+                                            span: 242..243,
+                                        },
+                                    ),
+                                },
+                                span: 234..244,
+                            },
+                        ),
+                        cond: Some(
+                            Spanned {
+                                node: BinOp {
+                                    op: Spanned {
+                                        node: LessThan,
+                                        span: 247..248,
+                                    },
+                                    left: Spanned {
+                                        node: Ident(
+                                            RefId(
+                                                7,
+                                            ),
+                                            "i",
+                                        ),
+                                        span: 245..246,
+                                    },
+                                    right: Spanned {
+                                        node: IntLit(
+                                            10,
+                                        ),
+                                        span: 249..251,
+                                    },
+                                },
+                                span: 245..251,
+                            },
+                        ),
+                        update: Some(
+                            Spanned {
+                                node: UnaryOp {
+                                    op: Spanned {
+                                        node: Increment,
+                                        span: 254..256,
+                                    },
+                                    expr: Spanned {
+                                        node: Ident(
+                                            RefId(
+                                                8,
+                                            ),
+                                            "i",
+                                        ),
+                                        span: 253..254,
+                                    },
+                                    prefix: false,
+                                },
+                                span: 253..256,
+                            },
+                        ),
+                        body: Spanned {
+                            node: Block(
+                                [
+                                    Spanned {
+                                        node: Expr(
+                                            Spanned {
+                                                node: BinOp {
+                                                    op: Spanned {
+                                                        node: AddAssign,
+                                                        span: 271..273,
+                                                    },
+                                                    left: Spanned {
+                                                        node: Ident(
+                                                            RefId(
+                                                                9,
+                                                            ),
+                                                            "result",
+                                                        ),
+                                                        span: 264..270,
+                                                    },
+                                                    right: Spanned {
+                                                        node: Ident(
+                                                            RefId(
+                                                                10,
+                                                            ),
+                                                            "i",
+                                                        ),
+                                                        span: 274..275,
+                                                    },
+                                                },
+                                                span: 264..275,
+                                            },
+                                        ),
+                                        span: 264..276,
+                                    },
+                                ],
+                            ),
+                            span: 258..280,
+                        },
+                    },
+                    span: 229..280,
+                },
+                Spanned {
+                    node: Expr(
+                        Spanned {
+                            node: Call {
+                                func: Spanned {
+                                    node: Ident(
+                                        RefId(
+                                            11,
+                                        ),
+                                        "factorial",
+                                    ),
+                                    span: 284..293,
+                                },
+                                args: [
+                                    Spanned {
+                                        node: Ident(
+                                            RefId(
+                                                12,
+                                            ),
+                                            "result",
+                                        ),
+                                        span: 294..300,
+                                    },
+                                ],
+                            },
+                            span: 284..301,
+                        },
+                    ),
+                    span: 284..302,
+                },
+                Spanned {
+                    node: Return(
+                        Some(
+                            Spanned {
+                                node: IntLit(
+                                    0,
+                                ),
+                                span: 313..314,
+                            },
+                        ),
+                    ),
+                    span: 306..315,
+                },
+            ],
+        ),
+        span: 133..317,
+    },
+)
+CFG for function factorial:
+BBId(0): % preds = []
+  %0 = function factorial
+  %2 = param[0]
+  %4 = const 1
+  %5 = leq %2, %4
+  br_cond %5 ? BBId(1) : BBId(2)
+
+BBId(1): % preds = [BBId(0)]
+  %6 = const 1
+  return %6
+
+BBId(2): % preds = [BBId(0)]
+  %10 = const 1
+  %11 = sub %2, %10
+  %12 = call %0(%11)
+  %13 = mul %2, %12
+  return %13
+
+
+CFG for function main:
+BBId(0): % preds = []
+  %0 = function factorial
+  %1 = function main
+  %2 = const 0
+  %4 = const 10
+  %5 = lt %2, %4
+  br_cond %5 ? BBId(1) : BBId(2)
+
+BBId(1): % preds = [BBId(0)]
+  br BBId(3)
+
+BBId(2): % preds = [BBId(0)]
+  br BBId(3)
+
+BBId(3): % preds = [BBId(1), BBId(2)]
+  %28 = Φ(2@BB1, 3@BB2)
+  br BBId(4)
+
+BBId(4): % preds = [BBId(3), BBId(6)]
+  %29 = Φ(0@BB3, %17@BB6)
+  %34 = Φ(%28@BB3, %13@BB6)
+  %37 = Φ(%0@BB3, %37@BB6)
+  %38 = Φ(0@BB3, %38@BB6)
+  %39 = Φ(%1@BB3, %39@BB6)
+  %10 = const 10
+  %11 = lt %29, %10
+  br_cond %11 ? BBId(5) : BBId(7)
+
+BBId(5): % preds = [BBId(4)]
+  %13 = add %34, %29
+  br BBId(6)
+
+BBId(6): % preds = [BBId(5)]
+  %16 = const 1
+  %17 = add %29, %16
+  br BBId(4)
+
+BBId(7): % preds = [BBId(4)]
+  %20 = call %37(%34)
+  %21 = const 0
+  return %21
+
+
+
+STDERR:
+note: Name resolution
+  ┌─ tests/valid.c:3:7
+  │
+2 │ int factorial(int n) {
+  │                   - Resolved to VarId(0)
+3 │   if (n <= 1) {
+  │       ^ Ref at RefId(0)
+
+note: Name resolution
+  ┌─ tests/valid.c:6:10
+  │
+2 │ int factorial(int n) {
+  │                   - Resolved to VarId(0)
+  ·
+6 │   return n * factorial(n - 1);
+  │          ^ Ref at RefId(1)
+
+note: Name resolution
+  ┌─ tests/valid.c:6:14
+  │
+2 │ int factorial(int n) {
+  │     --------- Resolved to VarId(1)
+  ·
+6 │   return n * factorial(n - 1);
+  │              ^^^^^^^^^ Ref at RefId(2)
+
+note: Name resolution
+  ┌─ tests/valid.c:6:24
+  │
+2 │ int factorial(int n) {
+  │                   - Resolved to VarId(0)
+  ·
+6 │   return n * factorial(n - 1);
+  │                        ^ Ref at RefId(3)
+
+note: Name resolution
+   ┌─ tests/valid.c:13:7
+   │
+10 │   int x = 0;
+   │       - Resolved to VarId(2)
+   ·
+13 │   if (x < 10) {
+   │       ^ Ref at RefId(4)
+
+note: Name resolution
+   ┌─ tests/valid.c:14:5
+   │
+11 │   int result;
+   │       ------ Resolved to VarId(3)
+   ·
+14 │     result = 2;
+   │     ^^^^^^ Ref at RefId(5)
+
+note: Name resolution
+   ┌─ tests/valid.c:16:5
+   │
+11 │   int result;
+   │       ------ Resolved to VarId(3)
+   ·
+16 │     result = 3;
+   │     ^^^^^^ Ref at RefId(6)
+
+note: Name resolution
+   ┌─ tests/valid.c:19:19
+   │
+19 │   for (int i = 0; i < 10; i++) {
+   │            -      ^ Ref at RefId(7)
+   │            │       
+   │            Resolved to VarId(4)
+
+note: Name resolution
+   ┌─ tests/valid.c:19:27
+   │
+19 │   for (int i = 0; i < 10; i++) {
+   │            -              ^ Ref at RefId(8)
+   │            │               
+   │            Resolved to VarId(4)
+
+note: Name resolution
+   ┌─ tests/valid.c:20:5
+   │
+11 │   int result;
+   │       ------ Resolved to VarId(3)
+   ·
+20 │     result += i;
+   │     ^^^^^^ Ref at RefId(9)
+
+note: Name resolution
+   ┌─ tests/valid.c:20:15
+   │
+19 │   for (int i = 0; i < 10; i++) {
+   │            - Resolved to VarId(4)
+20 │     result += i;
+   │               ^ Ref at RefId(10)
+
+note: Name resolution
+   ┌─ tests/valid.c:23:3
+   │
+ 2 │ int factorial(int n) {
+   │     --------- Resolved to VarId(1)
+   ·
+23 │   factorial(result);
+   │   ^^^^^^^^^ Ref at RefId(11)
+
+note: Name resolution
+   ┌─ tests/valid.c:23:13
+   │
+11 │   int result;
+   │       ------ Resolved to VarId(3)
+   ·
+23 │   factorial(result);
+   │             ^^^^^^ Ref at RefId(12)
+

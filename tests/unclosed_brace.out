@@ -1,0 +1,13 @@
+STDOUT:
+
+STDERR:
+error: unclosed brace '{'
+  ┌─ tests/unclosed_brace.c:2:12
+  │
+2 │ int main() {
+  │            ^
+  │            │
+  │            expected closing brace '{'
+  │            opening delimiter here
+
+Error: Parsing failed

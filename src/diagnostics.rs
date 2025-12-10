@@ -16,7 +16,7 @@ pub fn show_diagnostics<T: IntoDiagnostic>(
     let mut files = SimpleFiles::new();
     let file_id = files.add(filename.as_ref(), source);
 
-    let mut writer = StandardStream::stderr(ColorChoice::Always);
+    let mut writer = StandardStream::stderr(ColorChoice::Auto);
     let config = term::Config::default();
 
     for error in errors {
@@ -42,7 +42,7 @@ pub fn show_diagnostics_with_sema<T: SemanticsAwareIntoDiagnostic>(
     let mut files = SimpleFiles::new();
     let file_id = files.add(filename.as_ref(), source);
 
-    let mut writer = StandardStream::stderr(ColorChoice::Always);
+    let mut writer = StandardStream::stderr(ColorChoice::Auto);
     let config = term::Config::default();
 
     for error in errors {

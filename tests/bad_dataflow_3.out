@@ -1,0 +1,16 @@
+STDOUT:
+
+STDERR:
+CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [SingleMalformedPhiInfo { bb_id: BBId(3), phi_var_id: Some(VarId(0)), sources: {BBId(1): Value(ValueRef(2, 58..59, None))} }], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(3), dest_val: ValueRef(3, 91..92, None), assigned_val: Value(ValueRef(6, 29..30, Some(VarId(0)))) }] })
+error: Use before initialization detected during CFG lowering
+   ┌─ tests/bad_dataflow_3.c:10:12
+   │
+ 3 │     int x;
+   │         - Variable declaration site
+   ·
+10 │     return x;
+   │            ^ value not valid due to prior malformed phi
+   │
+   = note: this means that there are assignments to this variable, but not on all possible code paths
+
+Error: CFG lowering failed
