@@ -157,7 +157,15 @@ fn lower_block_to_block(
     warnings: &mut Vec<CfgWarning>,
 ) {
     for stmt in &block.node.stmts {
-        lower_stmt_to_block(builder, bb_id, cf_loop, stmt, sema, semantic_errors, warnings);
+        lower_stmt_to_block(
+            builder,
+            bb_id,
+            cf_loop,
+            stmt,
+            sema,
+            semantic_errors,
+            warnings,
+        );
     }
 }
 
@@ -291,8 +299,12 @@ fn lower_stmt_to_block(
                 semantic_errors,
                 warnings,
             );
-            builder
-                .set_tail_instruction(body_bb, TailCfgInstruction::UncondBranch { target: entry });
+            if !builder.bb_has_tail(body_bb) {
+                builder.set_tail_instruction(
+                    body_bb,
+                    TailCfgInstruction::UncondBranch { target: entry },
+                );
+            }
             *bb_id = exit_bb;
         }
         Stmt::For {
@@ -356,10 +368,12 @@ fn lower_stmt_to_block(
                 warnings,
             );
             // Lower update
-            builder.set_tail_instruction(
-                body_bb,
-                TailCfgInstruction::UncondBranch { target: update_bb },
-            );
+            if !builder.bb_has_tail(body_bb) {
+                builder.set_tail_instruction(
+                    body_bb,
+                    TailCfgInstruction::UncondBranch { target: update_bb },
+                );
+            }
             if let Some(update_expr) = update {
                 lower_expr(builder, &mut update_bb, update_expr, sema, semantic_errors);
             }

@@ -1,0 +1,7 @@
+//@ARGS: --cfg
+int main() {
+    for (;;) {
+        return 0;
+    }
+    return 0;
+}
