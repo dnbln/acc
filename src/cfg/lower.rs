@@ -1770,19 +1770,32 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
         let mut changed = false;
 
         for bb in &builder.blocks {
-            for phi in &bb.phi {
-                for source in phi.sources.values() {
-                    match source {
-                        ValueRefOrConst::Value(v) => {
-                            if !live_values.contains(v) {
-                                live_values.insert(*v);
-                                changed = true;
-                            }
-                        }
-                        ValueRefOrConst::Const(_) => {}
+
+            match &bb.tail {
+                TailCfgInstruction::CondBranch {
+                    cond,
+                    then_bb: _,
+                    else_bb: _,
+                } => {
+                    if !live_values.contains(cond) {
+                        live_values.insert(*cond);
+                        changed = true;
                     }
                 }
+                TailCfgInstruction::UncondBranch { target: _ } => {}
+                TailCfgInstruction::Return { value } => {
+                    if let Some(v) = value {
+                        if !live_values.contains(v) {
+                            live_values.insert(*v);
+                            changed = true;
+                        }
+                    }
+                }
+                TailCfgInstruction::Undefined => {
+                    unreachable!()
+                }
             }
+
             for instr in bb.instructions.iter().rev() {
                 match instr {
                     CfgInstruction::Assign { dest, val } => {
@@ -1862,28 +1875,20 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                 }
             }
 
-            match &bb.tail {
-                TailCfgInstruction::CondBranch {
-                    cond,
-                    then_bb: _,
-                    else_bb: _,
-                } => {
-                    if !live_values.contains(cond) {
-                        live_values.insert(*cond);
-                        changed = true;
-                    }
-                }
-                TailCfgInstruction::UncondBranch { target: _ } => {}
-                TailCfgInstruction::Return { value } => {
-                    if let Some(v) = value {
-                        if !live_values.contains(v) {
-                            live_values.insert(*v);
-                            changed = true;
+            for phi in &bb.phi {
+                for source in phi.sources.values() {
+                    match source {
+                        ValueRefOrConst::Value(v) => {
+                            if !live_values.contains(v)
+                                // avoid %y = phi(%x@B1, %y@B2) for variables in loops, if %y is not live
+                                && phi.dest != *v
+                            {
+                                live_values.insert(*v);
+                                changed = true;
+                            }
                         }
+                        ValueRefOrConst::Const(_) => {}
                     }
-                }
-                TailCfgInstruction::Undefined => {
-                    unreachable!()
                 }
             }
         }
@@ -1900,6 +1905,7 @@ fn dead_value_elimination(builder: &mut CfgBuilder) {
     let live_values = live_values_analysis(builder);
 
     for bb in &mut builder.blocks {
+        bb.phi.retain(|phi| live_values.contains(&phi.dest));
         bb.instructions.retain(|instr| {
             if let CfgInstruction::Assign { dest, val: _ } = instr
                 && !live_values.contains(dest)

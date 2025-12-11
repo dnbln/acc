@@ -55,7 +55,6 @@ BBId(0): % preds = []
   br BBId(1)
 
 BBId(1): % preds = [BBId(0), BBId(2)]
-  %3 = Φ(%0@BB0, %3@BB2)
   %1 = const 1
   br_cond %1 ? BBId(2) : BBId(3)
 

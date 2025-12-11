@@ -7,7 +7,6 @@ BBId(0): % preds = []
 BBId(1): % preds = [BBId(0), BBId(3)]
   %13 = Φ(0@BB0, %13@BB3)
   %14 = Φ(0@BB0, %11@BB3)
-  %15 = Φ(%0@BB0, %15@BB3)
   %4 = const 10
   %5 = lt %14, %4
   br_cond %5 ? BBId(2) : BBId(4)
