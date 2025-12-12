@@ -115,6 +115,7 @@ pub fn c_operators() -> OpConfig {
         .infix_right("-=", 10)
         .infix_right("*=", 10)
         .infix_right("/=", 10)
+        .infix_right("%=", 10)
         .infix_left("||", 20)
         .infix_left("&&", 25)
         .infix_left("|", 30)
@@ -143,4 +144,42 @@ pub fn c_operators() -> OpConfig {
         .prefix("--", 80)
         .postfix("++", 90)
         .postfix("--", 90)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    Plus,
+    Minus,
+    Not,
+    BitwiseNot,
+    Increment,
+    Decrement,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulus,
+    Assign,
+    AddAssign,
+    SubtractAssign,
+    MultiplyAssign,
+    DivideAssign,
+    ModulusAssign,
+    Equal,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    And,
+    Or,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
 }

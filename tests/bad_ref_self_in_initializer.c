@@ -1,5 +1,5 @@
 //@FAIL
 int main() {
-    int x = (1 + 2;
+    int x = x;
     return 0;
 }

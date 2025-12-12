@@ -1,4 +1,6 @@
-use logos::{Logos, Span};
+use logos::Logos;
+
+use crate::parser::{operator::{BinaryOp, UnaryOp}, span::Span};
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t\n\r]+")]
@@ -67,6 +69,8 @@ pub enum TokenKind {
     MulEq,
     #[token("/=")]
     DivEq,
+    #[token("%=")]
+    ModEq,
     #[token("<<")]
     Shl,
     #[token(">>")]
@@ -118,6 +122,48 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    pub fn as_unary_op(&self) -> Option<UnaryOp> {
+        Some(match self {
+            TokenKind::Plus => UnaryOp::Plus,
+            TokenKind::Minus => UnaryOp::Minus,
+            TokenKind::Bang => UnaryOp::Not,
+            TokenKind::Tilde => UnaryOp::BitwiseNot,
+            TokenKind::PlusPlus => UnaryOp::Increment,
+            TokenKind::MinusMinus => UnaryOp::Decrement,
+            _ => return None,
+        })
+    }
+
+    pub fn as_binary_op(&self) -> Option<BinaryOp> {
+        Some(match self {
+            TokenKind::Plus => BinaryOp::Add,
+            TokenKind::Minus => BinaryOp::Subtract,
+            TokenKind::Star => BinaryOp::Multiply,
+            TokenKind::Slash => BinaryOp::Divide,
+            TokenKind::Percent => BinaryOp::Modulus,
+            TokenKind::Assign => BinaryOp::Assign,
+            TokenKind::Eq => BinaryOp::Equal,
+            TokenKind::Ne => BinaryOp::NotEqual,
+            TokenKind::Lt => BinaryOp::LessThan,
+            TokenKind::Gt => BinaryOp::GreaterThan,
+            TokenKind::Le => BinaryOp::LessThanOrEqual,
+            TokenKind::Ge => BinaryOp::GreaterThanOrEqual,
+            TokenKind::And => BinaryOp::And,
+            TokenKind::Or => BinaryOp::Or,
+            TokenKind::Amp => BinaryOp::BitwiseAnd,
+            TokenKind::Pipe => BinaryOp::BitwiseOr,
+            TokenKind::Caret => BinaryOp::BitwiseXor,
+            TokenKind::Shl => BinaryOp::LeftShift,
+            TokenKind::Shr => BinaryOp::RightShift,
+            TokenKind::PlusEq => BinaryOp::AddAssign,
+            TokenKind::MinusEq => BinaryOp::SubtractAssign,
+            TokenKind::MulEq => BinaryOp::MultiplyAssign,
+            TokenKind::DivEq => BinaryOp::DivideAssign,
+            TokenKind::ModEq => BinaryOp::ModulusAssign,
+            _ => return None,
+        })
+    }
+
     pub fn as_op_str(&self) -> Option<&'static str> {
         Some(match self {
             TokenKind::Plus => "+",
@@ -145,6 +191,7 @@ impl TokenKind {
             TokenKind::MinusEq => "-=",
             TokenKind::MulEq => "*=",
             TokenKind::DivEq => "/=",
+            TokenKind::ModEq => "%=",
             TokenKind::Shl => "<<",
             TokenKind::Shr => ">>",
             _ => return None,
@@ -179,6 +226,7 @@ impl TokenKind {
             TokenKind::MinusEq => "'-='",
             TokenKind::MulEq => "'*='",
             TokenKind::DivEq => "'/='",
+            TokenKind::ModEq => "'%='",
             TokenKind::Shl => "'<<'",
             TokenKind::Shr => "'>>'",
             TokenKind::Plus => "'+'",

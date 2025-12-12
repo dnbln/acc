@@ -1,0 +1,16 @@
+STDOUT:
+
+STDERR:
+CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(0), dest_val: ValueRef(3, 115..116, None), assigned_val: _VarId(VarId(0)) }] })
+error: Use before initialization detected during CFG lowering
+   ┌─ tests/resolve_shadowing_bad_dataflow.c:11:12
+   │
+ 3 │     int x;
+   │         - Variable declaration site
+   ·
+11 │     return x;
+   │            ^ value not valid (not yet initialized)
+   │
+   = note: this means that you are trying to use a variable that has not been assigned a value yet
+
+Error: CFG lowering failed

@@ -1,0 +1,27 @@
+STDOUT:
+
+STDERR:
+CFG lowering error in function foo: MalformedPhiInfo(MalformedPhiInfo { infos: [SingleMalformedPhiInfo { bb_id: BBId(5), phi_var_id: Some(VarId(2)), sources: {BBId(4): Value(ValueRef(10, 126..127, None))} }, SingleMalformedPhiInfo { bb_id: BBId(3), phi_var_id: Some(VarId(2)), sources: {BBId(1): Value(ValueRef(6, 77..78, None)), BBId(5): Value(ValueRef(24, 39..40, Some(VarId(2))))} }, SingleMalformedPhiInfo { bb_id: BBId(6), phi_var_id: Some(VarId(2)), sources: {BBId(3): Value(ValueRef(23, 39..40, Some(VarId(2))))} }, SingleMalformedPhiInfo { bb_id: BBId(7), phi_var_id: Some(VarId(2)), sources: {BBId(3): Value(ValueRef(23, 39..40, Some(VarId(2))))} }, SingleMalformedPhiInfo { bb_id: BBId(8), phi_var_id: Some(VarId(3)), sources: {BBId(6): Value(ValueRef(14, 169..170, None)), BBId(7): Value(ValueRef(15, 195..196, None))} }, SingleMalformedPhiInfo { bb_id: BBId(8), phi_var_id: Some(VarId(2)), sources: {BBId(6): Value(ValueRef(35, 39..40, Some(VarId(2)))), BBId(7): Value(ValueRef(36, 39..40, Some(VarId(2))))} }], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(6), dest_val: ValueRef(14, 169..170, None), assigned_val: Value(ValueRef(35, 39..40, Some(VarId(2)))) }, SingleMalformedAssignmentInfo { bb_id: BBId(8), dest_val: ValueRef(16, 215..216, None), assigned_val: Value(ValueRef(25, 50..51, Some(VarId(3)))) }] })
+error: Use before initialization detected during CFG lowering
+   ┌─ tests/bad_dataflow.c:13:11
+   │
+ 3 │     int x;
+   │         - Variable declaration site
+   ·
+13 │         y=x;
+   │           ^ value not valid due to prior malformed phi
+   │
+   = note: this means that there are assignments to this variable, but not on all possible code paths
+
+error: Use before initialization detected during CFG lowering
+   ┌─ tests/bad_dataflow.c:17:12
+   │
+ 4 │     int y;
+   │         - Variable declaration site
+   ·
+17 │     return y;
+   │            ^ value not valid due to prior malformed phi
+   │
+   = note: this means that there are assignments to this variable, but not on all possible code paths
+
+Error: CFG lowering failed

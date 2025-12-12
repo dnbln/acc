@@ -16,7 +16,7 @@ Parsed using Pratt parsing with the following binding powers:
 | 30 | `|` | Infix | Left |
 | 25 | `&&` | Infix | Left |
 | 20 | `||` | Infix | Left |
-| 10 | `=` `+=` `-=` `*=` `/=` | Infix | Right |
+| 10 | `=` `+=` `-=` `*=` `/=` `%=` | Infix | Right |
 
 
 ## Grammar Specification
@@ -266,6 +266,7 @@ assignment_op
            | '-='
            | '*='
            | '/='
+           | '%='
 ```
 
 referenced by:

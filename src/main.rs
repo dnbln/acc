@@ -1,49 +1,177 @@
-mod diagnostics;
+use std::fs;
+use std::path::PathBuf;
 
-mod parser;
-use crate::diagnostics::show_diagnostics;
-use anyhow::{Result, anyhow};
+use acc::cfg::lower::LowerError;
+use acc::cfg::sema;
+use acc::diagnostics::{IntoDiagnostic, show_diagnostics, show_diagnostics_with_sema};
+use acc::parser::ast::{RefId, VarId};
+use acc::parser::{Parser as CParser, TopLevel};
+use anyhow::{Result, anyhow, bail};
 use clap::Parser;
-use parser::{Parser as CParser, TopLevel};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(value_name = "FILE")]
-    path: String,
+    path: PathBuf,
+    /// Display the AST after parsing
+    #[clap(long)]
+    ast: bool,
+    /// Display resolved names after semantic analysis
+    #[clap(long)]
+    resolve: bool,
+
+    /// Display the CFGs after lowering
+    #[clap(long)]
+    cfg: bool,
+
+    /// Generate Graphviz DOT files for CFGs after lowering, under directory DIR
+    #[clap(long, value_name = "DIR")]
+    cfg_graphviz: Option<PathBuf>,
+}
+
+pub struct SemaTargetDisplay {
+    ref_id: RefId,
+    ref_span: acc::parser::span::Span,
+    var_id: VarId,
+    var_span: acc::parser::span::Span,
+}
+
+impl IntoDiagnostic for SemaTargetDisplay {
+    fn to_diagnostic(&self, file_id: usize) -> codespan_reporting::diagnostic::Diagnostic<usize> {
+        codespan_reporting::diagnostic::Diagnostic::note()
+            .with_message("Name resolution")
+            .with_labels(vec![
+                codespan_reporting::diagnostic::Label::primary(file_id, self.ref_span.range())
+                    .with_message(format!("Ref at {:?}", self.ref_id)),
+                codespan_reporting::diagnostic::Label::secondary(file_id, self.var_span.range())
+                    .with_message(format!("Resolved to {:?}", self.var_id)),
+            ])
+    }
+}
+
+fn display_cfg_errors(
+    source: impl AsRef<str>,
+    filename: impl AsRef<str>,
+    errors: &LowerError,
+    sema: &sema::SemaResults,
+) {
+    match errors {
+        LowerError::MalformedPhiInfo(infos) => {
+            show_diagnostics_with_sema(source, filename, &infos.malformed_assignments, sema);
+        }
+        _ => {}
+    }
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
     let path = args.path;
-    let source = std::fs::read_to_string(&path).unwrap();
+    let source = fs::read_to_string(&path).unwrap();
 
-    let top_level = match CParser::new(&source) {
+    let program = match CParser::new(&source) {
         Ok(mut parser) => match parser.parse_program() {
             Ok(program) => program,
             Err(e) => {
-                show_diagnostics(&source, &path, &[e]);
+                show_diagnostics(&source, path.to_string_lossy().as_ref(), &[e]);
                 return Err(anyhow!("Parsing failed"));
             }
         },
         Err(errors) => {
-            show_diagnostics(source, path.as_str(), &errors);
-            return Err(anyhow!("Could not tokenize input"));
+            show_diagnostics(&source, path.to_string_lossy(), &errors);
+            bail!("Could not tokenize input");
         }
     };
 
-    for stmt in top_level {
-        match *stmt {
-            TopLevel::Function(ref func) => {
-                println!("Parsed function: {}", *func.name);
-                println!("Parameters: {:?}", func.params);
-                println!("Return Type: {:?}", func.return_type);
-                println!("Body: {:?}", func.body);
-            }
-            _ => {
-                println!("Parsed top-level item.");
+    if args.ast {
+        for stmt in &program.items {
+            match &**stmt {
+                TopLevel::Function(func, _) => {
+                    println!("Parsed function: {}", *func.name);
+                    println!("Parameters: {:#?}", func.params);
+                    println!("Return Type: {:#?}", func.return_type);
+                    println!("Body: {:#?}", func.body);
+                }
+                _ => {
+                    println!("Parsed top-level item.");
+                }
             }
         }
+    }
+
+    let resolved = sema::sema(&program);
+    let sema = match resolved {
+        Ok(r) => r,
+        Err(errors) => {
+            show_diagnostics(&source, path.to_string_lossy(), &errors);
+            bail!("Semantic analysis failed");
+        }
+    };
+
+    if args.resolve {
+        let mut displays = Vec::new();
+        for (ref_id, var_id) in &sema.m {
+            let ref_span = sema.refs.get(ref_id).unwrap().clone();
+            let var_span = sema.vars.get(var_id).unwrap().clone();
+            displays.push(SemaTargetDisplay {
+                ref_id: *ref_id,
+                ref_span,
+                var_id: *var_id,
+                var_span,
+            });
+        }
+
+        show_diagnostics(&source, path.to_string_lossy(), &displays);
+    }
+
+    let mut warnings = Vec::new();
+    for top_level in &program.items {
+        match &**top_level {
+            TopLevel::Function(func, _) => {
+                let cfg = match acc::cfg::lower::lower_ast_to_cfg(&program.items, func, &sema, &mut warnings) {
+                    Ok(cfg) => cfg,
+                    Err(error) => {
+                        eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
+
+                        display_cfg_errors(&source, path.to_string_lossy(), &error, &sema);
+
+                        bail!("CFG lowering failed");
+                    }
+                };
+
+                if args.cfg {
+                    println!("CFG for function {}:\n{}", *func.name, cfg);
+                }
+
+                if let Some(cfg_graphviz_dir) = &args.cfg_graphviz {
+                    if !cfg_graphviz_dir.exists() {
+                        fs::create_dir_all(cfg_graphviz_dir).map_err(|e| {
+                            anyhow!(
+                                "Failed to create directory {}: {}",
+                                cfg_graphviz_dir.display(),
+                                e
+                            )
+                        })?;
+                    }
+
+                    let dot_output = acc::cfg::display::graphviz(&cfg);
+                    let dot_filename = cfg_graphviz_dir.join(format!("{}.dot", func.name.node));
+                    fs::write(&dot_filename, dot_output).map_err(|e| {
+                        anyhow!(
+                            "Failed to write Graphviz DOT file {}: {}",
+                            dot_filename.display(),
+                            e
+                        )
+                    })?;
+                    println!("Wrote CFG Graphviz DOT file to {}", dot_filename.display());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if !warnings.is_empty() {
+        show_diagnostics(&source, path.to_string_lossy(), &warnings);
     }
 
     Ok(())

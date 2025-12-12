@@ -1,5 +1,6 @@
 [package]
-name = "pratt_pitt"
+name = "acc"
+description = "Academic C Compiler"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,3 +10,12 @@ clap = { version = "4.5.53", features = ["derive"] }
 codespan-reporting = "0.13.1"
 logos = "0.15.1"
 thiserror = "2.0"
+
+[dev-dependencies]
+libtest-mimic = "0.5.0"
+
+[[test]]
+name = "tests"
+path = "src/test_harness.rs"
+harness = false
+
