@@ -42,10 +42,6 @@ BBId(10): % preds = [BBId(8)]
   %9 = const 0
   return %9
 
-BBId(11): % preds = []
-  %10 = const 0
-  return %10
-
 
 
 STDERR:

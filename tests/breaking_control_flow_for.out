@@ -3,19 +3,12 @@ CFG for function main:
 BBId(0): % preds = []
   br BBId(1)
 
-BBId(1): % preds = [BBId(0), BBId(3)]
+BBId(1): % preds = [BBId(0)]
   br BBId(2)
 
 BBId(2): % preds = [BBId(1)]
   %1 = const 0
   return %1
-
-BBId(3): % preds = []
-  br BBId(1)
-
-BBId(4): % preds = []
-  %2 = const 0
-  return %2
 
 
 

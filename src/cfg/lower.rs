@@ -58,13 +58,12 @@ pub fn lower_ast_to_cfg(
     sema: &SemaResults,
     warnings: &mut Vec<CfgWarning>,
 ) -> Result<ControlFlowGraph, LowerError> {
-    let mut builder = CfgBuilder::new();
+    let (mut builder, entry) = CfgBuilder::new();
 
     let Some(body) = &ast.body else {
         return Err(LowerError::NoBody);
     };
 
-    let entry = builder.create_bb();
     let mut bb = entry;
 
     for def in program {
@@ -130,6 +129,7 @@ pub fn lower_ast_to_cfg(
     if !validate_errors.is_empty() {
         return Err(LowerError::CfgValidationErrors(validate_errors));
     }
+    builder.trim_dead_blocks();
 
     phi_insertion(&mut builder, sema);
     assignment_removal(&mut builder);
@@ -1353,12 +1353,20 @@ fn malformed_phi_reduction(builder: &mut CfgBuilder) -> MalformedPhiInfo {
                     } => dest,
                     _ => unreachable!(),
                 });
-                if let CfgInstruction::Assign { dest, val } = instr {
-                    malformed_assignments.push(SingleMalformedAssignmentInfo {
+                if let Some(v) = CfgBuilder::is_optimized_phi(&instr) {
+                    infos.push(SingleMalformedPhiInfo {
                         bb_id: bb.id,
-                        dest_val: dest,
-                        assigned_val: val.clone(),
+                        phi_var_id: Some(v),
+                        sources: BTreeMap::new(),
                     });
+                } else {
+                    if let CfgInstruction::Assign { dest, val } = instr {
+                        malformed_assignments.push(SingleMalformedAssignmentInfo {
+                            bb_id: bb.id,
+                            dest_val: dest,
+                            assigned_val: val,
+                        });
+                    }
                     changed = true;
                 }
             }

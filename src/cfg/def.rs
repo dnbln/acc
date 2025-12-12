@@ -10,10 +10,15 @@ pub struct BBId(pub(super) usize);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BasicBlock {
     pub(super) id: BBId,
+    /// Phi instructions at the start of the basic block
     pub(super) phi: Vec<PhiCfgInstruction>,
+    /// Actual instructions in the basic block
     pub(super) instructions: Vec<CfgInstruction>,
+    /// Tail instruction (branch/return)
     pub(super) tail: TailCfgInstruction,
+    /// Successor basic blocks (determined from tail instruction)
     pub(super) successors: Vec<BBId>,
+    /// Predecessor basic blocks (determined from successors of all blocks)
     pub(super) predecessors: Vec<BBId>,
 }
 
@@ -141,6 +146,15 @@ pub enum RValue {
         func: ValueRef,
         args: Vec<ValueRef>,
     },
+}
+
+impl RValue {
+    pub fn from_value_ref_or_const(v: &ValueRefOrConst) -> Self {
+        match v {
+            ValueRefOrConst::Value(val_ref) => RValue::Value(*val_ref),
+            ValueRefOrConst::Const(c) => RValue::Const(*c),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
