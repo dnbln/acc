@@ -1,0 +1,29 @@
+STDOUT:
+CFG for function main:
+BBId(0): % preds = []
+  %1 = const 1
+  br_cond %1 ? BBId(1) : BBId(2)
+
+BBId(1): % preds = [BBId(0)]
+  br BBId(3)
+
+BBId(2): % preds = [BBId(0)]
+  br BBId(3)
+
+BBId(3): % preds = [BBId(1), BBId(2)]
+  %24 = Φ(10@BB1, 20@BB2) [var x]
+  %6 = const 2
+  %7 = add %24, %6 [var x]
+  %9 = const 3
+  %10 = sub %7, %9 [var x]
+  %12 = const 4
+  %13 = mul %10, %12 [var x]
+  %15 = const 5
+  %16 = div %13, %15 [var x]
+  %18 = const 6
+  %19 = mod %16, %18 [var x]
+  return %19
+
+
+
+STDERR:

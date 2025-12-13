@@ -51,7 +51,7 @@ Body: Some(
 )
 CFG for function main:
 BBId(0): % preds = []
-  %0 = function main
+  %0 = function main [var main]
   br BBId(1)
 
 BBId(1): % preds = [BBId(0), BBId(2)]

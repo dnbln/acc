@@ -59,6 +59,8 @@ fn display_cfg_errors(
     match errors {
         LowerError::MalformedPhiInfo(infos) => {
             show_diagnostics_with_sema(source, filename, &infos.malformed_assignments, sema);
+
+            eprintln!("---\n{}", infos.display_in_graphviz(sema));
         }
         _ => {}
     }
@@ -128,7 +130,12 @@ fn main() -> Result<()> {
     for top_level in &program.items {
         match &**top_level {
             TopLevel::Function(func, _) => {
-                let cfg = match acc::cfg::lower::lower_ast_to_cfg(&program.items, func, &sema, &mut warnings) {
+                let cfg = match acc::cfg::lower::lower_ast_to_cfg(
+                    &program.items,
+                    func,
+                    &sema,
+                    &mut warnings,
+                ) {
                     Ok(cfg) => cfg,
                     Err(error) => {
                         eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
@@ -140,7 +147,11 @@ fn main() -> Result<()> {
                 };
 
                 if args.cfg {
-                    println!("CFG for function {}:\n{}", *func.name, cfg);
+                    println!(
+                        "CFG for function {}:\n{}",
+                        *func.name,
+                        cfg.display_with_sema(&sema)
+                    );
                 }
 
                 if let Some(cfg_graphviz_dir) = &args.cfg_graphviz {
@@ -154,7 +165,7 @@ fn main() -> Result<()> {
                         })?;
                     }
 
-                    let dot_output = acc::cfg::display::graphviz(&cfg);
+                    let dot_output = acc::cfg::display::graphviz(&cfg, &sema);
                     let dot_filename = cfg_graphviz_dir.join(format!("{}.dot", func.name.node));
                     fs::write(&dot_filename, dot_output).map_err(|e| {
                         anyhow!(

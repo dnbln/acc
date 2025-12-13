@@ -16,6 +16,7 @@ pub struct SemaResults {
     pub m: BTreeMap<RefId, VarId>,
     pub refs: BTreeMap<RefId, Span>,
     pub vars: BTreeMap<VarId, Span>,
+    pub var_names: BTreeMap<VarId, String>,
 }
 
 impl SemaResults {
@@ -24,8 +25,11 @@ impl SemaResults {
         self.refs.insert(ref_id, ref_span);
     }
 
-    fn add_declaration(&mut self, var_id: VarId, var_span: Span) {
+    fn add_declaration(&mut self, var_id: VarId, var_span: Span, var_name: Option<String>) {
         self.vars.insert(var_id, var_span);
+        if let Some(name) = var_name {
+            self.var_names.insert(var_id, name);
+        }
     }
 
     pub fn lookup_ref_id(&self, ref_id: RefId) -> Option<VarId> {
@@ -34,6 +38,13 @@ impl SemaResults {
 
     pub fn var_span(&self, var_id: VarId) -> Span {
         self.vars.get(&var_id).cloned().unwrap_or_default()
+    }
+
+    pub fn var_name(&self, var_id: VarId) -> String {
+        self.var_names
+            .get(&var_id)
+            .cloned()
+            .unwrap_or_else(|| var_id.to_string())
     }
 }
 
@@ -108,6 +119,7 @@ pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
         m: BTreeMap::new(),
         refs: BTreeMap::new(),
         vars: BTreeMap::new(),
+        var_names: BTreeMap::new(),
     };
     let mut sema_errors = Vec::new();
 
@@ -120,11 +132,11 @@ pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
             match &**item {
                 TopLevel::GlobalVar { name, id, span, .. } => {
                     top_level_names.vars.insert(name.node.clone(), *id);
-                    sema.add_declaration(*id, span.clone());
+                    sema.add_declaration(*id, span.clone(), Some(name.node.clone()));
                 }
                 TopLevel::Function(f, id) => {
                     top_level_names.vars.insert(f.name.node.clone(), *id);
-                    sema.add_declaration(*id, f.name.span);
+                    sema.add_declaration(*id, f.name.span, Some(f.name.node.clone()));
                 }
             }
         }
@@ -166,7 +178,7 @@ fn sema_function(
         };
         for (_, name, var_id) in &ast.params {
             base_frame.vars.insert(name.node.clone(), *var_id);
-            sema.add_declaration(*var_id, name.span);
+            sema.add_declaration(*var_id, name.span, Some(name.node.clone()));
         }
         stack.frames.push(base_frame);
     }
@@ -224,7 +236,7 @@ fn sema_stmt(
                 });
             }
 
-            sema.add_declaration(*id, name.span);
+            sema.add_declaration(*id, name.span, Some(name.node.clone()));
         }
         Stmt::Expr(spanned) => {
             sema_expr(spanned, sema, stack, sema_errors);

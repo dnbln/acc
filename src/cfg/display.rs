@@ -1,7 +1,10 @@
 use std::fmt::{self, Display, Write as _};
 
-use crate::cfg::def::{
-    CfgInstruction, ControlFlowGraph, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst,
+use crate::cfg::{
+    def::{
+        CfgInstruction, ControlFlowGraph, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst,
+    },
+    sema::SemaResults,
 };
 
 impl Display for ControlFlowGraph {
@@ -19,7 +22,86 @@ impl Display for ControlFlowGraph {
                 writeln!(f, ")")?;
             }
             for instr in &bb.instructions {
-                writeln!(f, "  {}", instr)?;
+                write!(f, "  {}", instr)?;
+
+                match instr {
+                    CfgInstruction::Assign { dest, val: _ } => {
+                        if let Some(var_id) = dest.2 {
+                            write!(
+                                f,
+                                " [var {}]",
+                                var_id
+                            )?;
+                        }
+                    }
+                    CfgInstruction::_AssignVar { var_id: _, val: _ } => {
+                        unreachable!()
+                    }
+                }
+
+                writeln!(f)?;
+            }
+            writeln!(f, "  {}", bb.tail)?;
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl ControlFlowGraph {
+    pub fn display_with_sema<'a>(&'a self, sema: &'a SemaResults) -> SemaCFGPresenter<'a> {
+        SemaCFGPresenter { cfg: self, sema }
+    }
+}
+
+pub struct SemaCFGPresenter<'a> {
+    cfg: &'a ControlFlowGraph,
+    sema: &'a SemaResults,
+}
+
+impl fmt::Display for SemaCFGPresenter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for bb in &self.cfg.basic_blocks {
+            writeln!(f, "{:?}: % preds = {:?}", bb.id, bb.predecessors)?;
+            for phi in &bb.phi {
+                write!(f, "  {} = Φ(", phi.dest)?;
+                for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{val}@BB{}", pred_bb.0)?;
+                }
+                write!(f, ")")?;
+
+                if let Some(var_id) = phi.var_id {
+                    write!(
+                        f,
+                        " [var {}]",
+                        self.sema.var_name(var_id)
+                    )?;
+                }
+
+                writeln!(f)?;
+            }
+            for instr in &bb.instructions {
+                write!(f, "  {}", instr)?;
+
+                match instr {
+                    CfgInstruction::Assign { dest, val: _ } => {
+                        if let Some(var_id) = dest.2 {
+                            write!(
+                                f,
+                                " [var {}]",
+                                self.sema.var_name(var_id)
+                            )?;
+                        }
+                    }
+                    CfgInstruction::_AssignVar { var_id: _, val: _ } => {
+                        unreachable!()
+                    }
+                }
+
+                writeln!(f)?;
             }
             writeln!(f, "  {}", bb.tail)?;
             writeln!(f)?;
@@ -177,7 +259,7 @@ impl Display for ValueRef {
     }
 }
 
-pub fn graphviz(cfg: &ControlFlowGraph) -> String {
+pub fn graphviz(cfg: &ControlFlowGraph, sema: &SemaResults) -> String {
     let mut output = String::new();
     output.push_str("digraph CFG {\n");
     for bb in &cfg.basic_blocks {
@@ -192,10 +274,29 @@ pub fn graphviz(cfg: &ControlFlowGraph) -> String {
                     }
                     write!(&mut s, "{val}@BB{}", pred_bb.0).unwrap();
                 }
-                writeln!(&mut s, ")").unwrap();
+                write!(&mut s, ")").unwrap();
+
+                if let Some(var_id) = phi.var_id {
+                    write!(&mut s, " [var {:?}]", sema.var_name(var_id)).unwrap();
+                }
+
+                writeln!(&mut s).unwrap();
             }
             for instr in &bb.instructions {
-                writeln!(&mut s, "  {}", instr).unwrap();
+                write!(&mut s, "  {}", instr).unwrap();
+
+                match instr {
+                    CfgInstruction::Assign { dest, val: _ } => {
+                        if let Some(var_id) = dest.2 {
+                            write!(&mut s, " [var {}]", sema.var_name(var_id)).unwrap();
+                        }
+                    }
+                    CfgInstruction::_AssignVar { var_id: _, val: _ } => {
+                        unreachable!()
+                    }
+                }
+
+                writeln!(&mut s).unwrap();
             }
             match &bb.tail {
                 TailCfgInstruction::Undefined => {
@@ -216,14 +317,12 @@ pub fn graphviz(cfg: &ControlFlowGraph) -> String {
                     )
                     .unwrap();
                 }
-                TailCfgInstruction::Return { value } => {
-                    match value {
-                        Some(v) => {
-                            writeln!(&mut s, "  return {}", v).unwrap();
-                        }
-                        None => {
-                            writeln!(&mut s, "  return").unwrap();
-                        }
+                TailCfgInstruction::Return { value } => match value {
+                    Some(v) => {
+                        writeln!(&mut s, "  return {}", v).unwrap();
+                    }
+                    None => {
+                        writeln!(&mut s, "  return").unwrap();
                     }
                 },
             }

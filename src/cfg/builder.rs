@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    cfg::def::*,
+    cfg::{def::*, sema::SemaResults},
     parser::{ast::VarId, span::Span},
 };
 
@@ -42,7 +42,7 @@ impl CfgBuilder {
     pub(super) fn allocate_value(&mut self, span: Span, var_id: Option<VarId>) -> ValueRef {
         let val_ref = self.next_value_ref;
         self.next_value_ref += 1;
-        ValueRef(val_ref, span, var_id)
+        ValueRef(val_ref, span, var_id, None)
     }
 
     pub(super) fn add_phi_instruction(
@@ -59,28 +59,24 @@ impl CfgBuilder {
         });
     }
 
-    pub(super) fn is_optimized_phi(instr: &CfgInstruction) -> Option<VarId> {
-        match instr {
-            CfgInstruction::Assign { dest, val } => match val {
-                RValue::Value(v) => {
-                    // An optimized phi is an assignment where the destination and source spans are the same
-                    // (e.g. both point to the same variable reference, e.g. the declaration, VarId).
-                    // Assignments (new versions of the variable) will have their destination span pointing
-                    // to the RefId of the new assignment.
-                    // this happens in add_phi_source when we optimize phis for blocks with a single predecessor
-                    // block, we create an assignment from the predecessor's value.
-                    if dest.2 == v.2
-                        && let Some(var_id) = dest.2
-                        && dest.1 == v.1
-                    {
-                        Some(var_id)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            },
-            _ => None,
+    pub(super) fn is_optimized_phi(instr: &CfgInstruction) -> Option<(ValueRef, BBId, ValueRef, VarId)> {
+        // An optimized phi is an assignment where the destination and source spans are the same
+        // (e.g. both point to the same variable reference, e.g. the declaration, VarId).
+        // Assignments (new versions of the variable) will have their destination span pointing
+        // to the RefId of the new assignment.
+        // this happens in add_phi_source when we optimize phis for blocks with a single predecessor
+        // block, we create an assignment from the predecessor's value.
+        // They keep the source BBId in the ValueRef.3 field.
+        if let CfgInstruction::Assign { dest, val } = instr
+            && let RValue::Value(v) = val
+            && dest.2 == v.2
+            && let Some(var_id) = dest.2
+            && dest.1 == v.1
+            && let Some(source_bb) = dest.3
+        {
+            Some((*dest, source_bb, *v, var_id))
+        } else {
+            None
         }
     }
 
@@ -98,8 +94,9 @@ impl CfgBuilder {
             // so we can just reuse the old value from the predecessor block
             assert_eq!(sources.len(), 1);
 
-            let (_, v) = sources.first_key_value().unwrap();
-            let dest = self.allocate_value(span, Some(var_id));
+            let (b, v) = sources.first_key_value().unwrap();
+            let mut dest = self.allocate_value(span, Some(var_id));
+            dest.3 = Some(*b); // mark as optimized phi
 
             self.blocks[bb_id.0].instructions.insert(
                 0,
@@ -222,7 +219,7 @@ impl CfgBuilder {
         println!("{}", s);
     }
 
-    pub(super) fn debug_graphviz(&self) -> String {
+    pub(super) fn debug_graphviz(&self, sema: &SemaResults) -> String {
         let mut output = String::new();
         output.push_str("digraph CFG {\n");
         for bb in &self.blocks {
@@ -237,10 +234,22 @@ impl CfgBuilder {
                         }
                         write!(&mut s, "{val}@BB{}", pred_bb.0).unwrap();
                     }
-                    writeln!(&mut s, ")").unwrap();
+                    write!(&mut s, ")").unwrap();
+                    if let Some(var_id) = phi.var_id {
+                        write!(&mut s, " ({})", sema.var_name(var_id)).unwrap();
+                    }
+                    writeln!(&mut s).unwrap();
                 }
                 for instr in &bb.instructions {
-                    writeln!(&mut s, "  {}", instr).unwrap();
+                    write!(&mut s, "  {}", instr).unwrap();
+                    let var_id = match instr {
+                        CfgInstruction::Assign { dest, .. } => dest.2,
+                        CfgInstruction::_AssignVar { var_id, .. } => Some(*var_id),
+                    };
+                    if let Some(var_id) = var_id {
+                        write!(&mut s, " ({})", sema.var_name(var_id)).unwrap();
+                    }
+                    writeln!(&mut s).unwrap();
                 }
                 match &bb.tail {
                     TailCfgInstruction::Undefined => {

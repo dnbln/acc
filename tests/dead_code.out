@@ -1,8 +1,8 @@
 STDOUT:
 CFG for function factorial:
 BBId(0): % preds = []
-  %0 = function factorial
-  %1 = param[0]
+  %0 = function factorial [var factorial]
+  %1 = param[0] [var n]
   %3 = const 1
   %4 = leq %1, %3
   br_cond %4 ? BBId(1) : BBId(2)

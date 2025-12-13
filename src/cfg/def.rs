@@ -23,7 +23,7 @@ pub struct BasicBlock {
 }
 
 #[derive(Clone, Copy, Eq, Ord, Hash, Debug)]
-pub struct ValueRef(pub(super) usize, pub(super) Span, pub(super) Option<VarId>);
+pub struct ValueRef(pub(super) usize, pub(super) Span, pub(super) Option<VarId>, pub(super) Option<BBId>);
 
 impl PartialEq for ValueRef {
     fn eq(&self, other: &Self) -> bool {

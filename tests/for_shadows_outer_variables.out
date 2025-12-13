@@ -1,19 +1,19 @@
 STDOUT:
 CFG for function main:
 BBId(0): % preds = []
-  %0 = function main
+  %0 = function main [var main]
   br BBId(1)
 
 BBId(1): % preds = [BBId(0), BBId(3)]
-  %13 = Φ(0@BB0, %13@BB3)
-  %14 = Φ(0@BB0, %11@BB3)
+  %13 = Φ(0@BB0, %13@BB3) [var i]
+  %14 = Φ(0@BB0, %11@BB3) [var i]
   %4 = const 10
   %5 = lt %14, %4
   br_cond %5 ? BBId(2) : BBId(4)
 
 BBId(2): % preds = [BBId(1)]
   %6 = const 1
-  %7 = add %14, %6
+  %7 = add %14, %6 [var i]
   br BBId(3)
 
 BBId(3): % preds = [BBId(2)]

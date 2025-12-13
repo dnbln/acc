@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::parser::{operator::{BinaryOp, UnaryOp}, span::Span};
 
 use super::span::Spanned;
@@ -41,6 +43,12 @@ pub enum Expr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VarId(pub(super) usize);
+
+impl fmt::Display for VarId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "v{}", self.0)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Block {

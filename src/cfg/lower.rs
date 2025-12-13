@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write as _,
+};
 
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 
@@ -134,9 +137,9 @@ pub fn lower_ast_to_cfg(
     phi_insertion(&mut builder, sema);
     assignment_removal(&mut builder);
 
-    let malformed = malformed_phi_reduction(&mut builder);
+    let malformed = malformed_phi_reduction(&mut builder, sema);
 
-    if !malformed.malformed_assignments.is_empty() {
+    if malformed.is_error() {
         return Err(LowerError::MalformedPhiInfo(malformed));
     }
 
@@ -554,7 +557,7 @@ fn lower_expr(
                 );
             };
 
-            let val_ref = builder.allocate_value(root.span, None);
+            let val_ref = builder.allocate_value(root.span, Some(id));
             builder.add_instruction(
                 *bb,
                 CfgInstruction::Assign {
@@ -631,14 +634,22 @@ fn lower_expr(
                         left_ident
                     );
                 };
+                let left_val = builder.allocate_value(root.span, Some(var_id));
+                builder.add_instruction(
+                    *bb,
+                    CfgInstruction::Assign {
+                        dest: left_val,
+                        val: RValue::Value(right_val),
+                    },
+                );
                 builder.add_instruction(
                     *bb,
                     CfgInstruction::_AssignVar {
                         var_id,
-                        val: RValue::Value(right_val),
+                        val: RValue::Value(left_val),
                     },
                 );
-                right_val
+                left_val
             }
             BinaryOp::AddAssign => lower_composite_assignment(
                 builder,
@@ -1253,8 +1264,10 @@ fn assignment_removal(builder: &mut CfgBuilder) {
 #[derive(Debug)]
 pub struct SingleMalformedPhiInfo {
     pub bb_id: BBId,
+    pub phi_dest: ValueRef,
     pub phi_var_id: Option<VarId>,
     pub sources: BTreeMap<BBId, ValueRefOrConst>,
+    pub missing_sources: BTreeSet<BBId>,
 }
 
 #[derive(Debug)]
@@ -1262,6 +1275,7 @@ pub struct SingleMalformedAssignmentInfo {
     pub bb_id: BBId,
     pub dest_val: ValueRef,
     pub assigned_val: RValue,
+    pub missing_sources: BTreeSet<BBId>,
 }
 
 impl SemanticsAwareIntoDiagnostic for SingleMalformedAssignmentInfo {
@@ -1294,25 +1308,192 @@ impl SemanticsAwareIntoDiagnostic for SingleMalformedAssignmentInfo {
 }
 
 #[derive(Debug)]
+pub struct SingleMalformedTailInfo {
+    pub bb_id: BBId,
+    pub missing_sources: BTreeSet<BBId>,
+}
+
+#[derive(Debug)]
 pub struct MalformedPhiInfo {
     pub infos: Vec<SingleMalformedPhiInfo>,
     pub malformed_assignments: Vec<SingleMalformedAssignmentInfo>,
+    pub phi_assignments: Vec<SingleMalformedAssignmentInfo>,
+    pub malformed_tails: Vec<SingleMalformedTailInfo>,
+    pub blocks: Vec<BasicBlock>,
 }
 
-fn malformed_phi_reduction(builder: &mut CfgBuilder) -> MalformedPhiInfo {
+impl MalformedPhiInfo {
+    fn is_error(&self) -> bool {
+        self.malformed_assignments.len() > 0 || self.malformed_tails.len() > 0
+    }
+
+    pub fn display_in_graphviz(&self, sema: &SemaResults) -> String {
+        let mut output = String::new();
+        output.push_str("digraph MalformedPhiInfo {\n");
+
+        let mut edges_missing_vars: BTreeMap<(BBId, BBId), BTreeSet<VarId>> = BTreeMap::new();
+
+        for block in &self.blocks {
+            let mut s = format!("BB{}:\n", block.id.0);
+
+            for phi in &block.phi {
+                let sources_str = phi
+                    .sources
+                    .iter()
+                    .map(|(bb_id, val)| format!("{val}@BB{}", bb_id.0))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(&mut s, "    {} = Φ({}", phi.dest, sources_str).unwrap();
+                self.infos
+                    .iter()
+                    .find(|info| info.bb_id == block.id && info.phi_dest == phi.dest)
+                    .map(|info| {
+                        if let Some(v) = info.phi_var_id {
+                            for p in info.missing_sources.iter() {
+                                edges_missing_vars
+                                    .entry((*p, block.id))
+                                    .or_default()
+                                    .insert(v);
+                            }
+                        }
+                        write!(
+                            &mut s,
+                            " [malformed: missing from BBs {:?}]",
+                            info.missing_sources
+                                .iter()
+                                .filter(|it| block.predecessors.contains(it))
+                                .map(|bb| bb.0)
+                                .collect::<Vec<_>>()
+                        )
+                        .unwrap();
+                    });
+                write!(&mut s, ")").unwrap();
+
+                if let Some(var_name) = phi.var_id.map(|it| sema.var_name(it)) {
+                    write!(&mut s, " ({var_name})").unwrap();
+                }
+                writeln!(&mut s).unwrap();
+            }
+
+            for instr in &block.instructions {
+                match instr {
+                    CfgInstruction::Assign { dest, val } => {
+                        write!(&mut s, "    {} = {}", dest, val).unwrap();
+                        self.malformed_assignments
+                            .iter()
+                            .find(|info| info.bb_id == block.id && info.dest_val == *dest)
+                            .or_else(|| {
+                                self.phi_assignments
+                                    .iter()
+                                    .find(|info| info.bb_id == block.id && info.dest_val == *dest)
+                            })
+                            .map(|info| {
+                                if let Some(v) = info.dest_val.2 {
+                                    for p in info.missing_sources.iter() {
+                                        edges_missing_vars
+                                            .entry((*p, block.id))
+                                            .or_default()
+                                            .insert(v);
+                                    }
+                                }
+
+                                write!(
+                                    &mut s,
+                                    " [malformed: missing from BBs {:?}]",
+                                    info.missing_sources
+                                        .iter()
+                                        .filter(|it| block.predecessors.contains(it)
+                                            || it == &&block.id)
+                                        .map(|bb| bb.0)
+                                        .collect::<Vec<_>>()
+                                )
+                                .unwrap();
+                            });
+                        if let Some(var_id) = dest.2 {
+                            write!(&mut s, " ({})", sema.var_name(var_id)).unwrap();
+                        }
+                        writeln!(&mut s).unwrap();
+                    }
+                    CfgInstruction::_AssignVar { var_id, val } => {
+                        unreachable!()
+                    }
+                }
+            }
+
+            match &block.tail {
+                TailCfgInstruction::UncondBranch { target } => {
+                    writeln!(&mut s, "    br BB{}", target.0).unwrap();
+                }
+                TailCfgInstruction::CondBranch {
+                    cond,
+                    then_bb,
+                    else_bb,
+                } => {
+                    writeln!(
+                        &mut s,
+                        "    br_cond {} ? BB{} : BB{};",
+                        cond, then_bb.0, else_bb.0
+                    )
+                    .unwrap();
+                }
+                TailCfgInstruction::Return { value: Some(value) } => {
+                    writeln!(&mut s, "    return {}", value).unwrap();
+                }
+                TailCfgInstruction::Return { value: None } => {
+                    writeln!(&mut s, "    return").unwrap();
+                }
+                TailCfgInstruction::Undefined => {
+                    writeln!(&mut s, "    <undefined>").unwrap();
+                }
+            }
+
+            writeln!(&mut output, "  BB{} [label={s:?}];", block.id.0).unwrap();
+        }
+
+        for block in &self.blocks {
+            for succ in &block.successors {
+                if let Some(vars) = edges_missing_vars.get(&(block.id, *succ)) {
+                    let var_names = vars
+                        .iter()
+                        .map(|v| sema.var_name(*v))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    writeln!(
+                        &mut output,
+                        "  BB{} -> BB{} [label=\"missing vars: {}\",fontcolor=red];",
+                        block.id.0, succ.0, var_names
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(&mut output, "  BB{} -> BB{};", block.id.0, succ.0).unwrap();
+                }
+            }
+        }
+
+        output.push_str("}\n");
+        output
+    }
+}
+
+fn malformed_phi_reduction(builder: &mut CfgBuilder, sema: &SemaResults) -> MalformedPhiInfo {
     // remove any phi instructions that have sources not matching the predecessors of the basic block
     let mut infos = Vec::new();
+    let mut phi_assignments = Vec::new();
     let mut removed_vals = BTreeSet::new();
     let mut malformed_assignments = Vec::new();
+    let mut phi_missing_sources = BTreeMap::<ValueRef, BTreeSet<BBId>>::new();
+    let mut malformed_tails = Vec::new();
+    let mut malformed_tail_blocks = BTreeSet::new();
+    let blocks_clone = builder.blocks.clone();
     loop {
         let mut changed = false;
         for bb in &mut builder.blocks {
+            let preds = bb.predecessors.iter().copied().collect::<BTreeSet<BBId>>();
             let malformed_phis = bb
                 .phi
                 .extract_if(0..bb.phi.len(), |phi| {
-                    phi.sources.keys().collect::<BTreeSet<&BBId>>()
-                        != bb.predecessors.iter().collect::<BTreeSet<&BBId>>()
-                        || phi.sources.iter().any(|s| match s.1 {
+                    phi.sources.keys().copied().collect::<BTreeSet<BBId>>() != preds
+                        || phi.sources.values().any(|s| match s {
                             ValueRefOrConst::Value(v) => removed_vals.contains(v),
                             _ => false,
                         })
@@ -1320,10 +1501,26 @@ fn malformed_phi_reduction(builder: &mut CfgBuilder) -> MalformedPhiInfo {
                 .collect::<Vec<_>>();
             for phi in malformed_phis {
                 removed_vals.insert(phi.dest);
+                let missing_sources = preds
+                    .difference(
+                        &phi.sources
+                            .iter()
+                            .filter(|(_, v)| match v {
+                                ValueRefOrConst::Value(v) => !removed_vals.contains(v),
+                                _ => true,
+                            })
+                            .map(|(bb_id, _)| *bb_id)
+                            .collect::<BTreeSet<BBId>>(),
+                    )
+                    .copied()
+                    .collect::<BTreeSet<BBId>>();
+                phi_missing_sources.insert(phi.dest, missing_sources.clone());
                 infos.push(SingleMalformedPhiInfo {
                     bb_id: bb.id,
+                    phi_dest: phi.dest,
                     phi_var_id: phi.var_id,
                     sources: phi.sources,
+                    missing_sources,
                 });
                 changed = true;
             }
@@ -1342,41 +1539,79 @@ fn malformed_phi_reduction(builder: &mut CfgBuilder) -> MalformedPhiInfo {
                 })
                 .collect::<Vec<_>>();
             for instr in malformed_instrs {
-                removed_vals.insert(match instr {
-                    CfgInstruction::Assign {
-                        dest,
-                        val: RValue::Value(_),
-                    } => dest,
-                    CfgInstruction::Assign {
-                        dest,
-                        val: RValue::_VarId(_),
-                    } => dest,
-                    _ => unreachable!(),
-                });
-                if let Some(v) = CfgBuilder::is_optimized_phi(&instr) {
-                    infos.push(SingleMalformedPhiInfo {
+                if let Some((dest, source_bb, v, var)) = CfgBuilder::is_optimized_phi(&instr) {
+                    removed_vals.insert(dest);
+                    // safe to propagate missing sources
+                    let mut old = phi_missing_sources.get(&v).cloned().unwrap_or_default();
+                    old.insert(source_bb);
+                    phi_missing_sources.insert(dest, old.clone());
+
+                    phi_assignments.push(SingleMalformedAssignmentInfo {
                         bb_id: bb.id,
-                        phi_var_id: Some(v),
-                        sources: BTreeMap::new(),
+                        dest_val: dest,
+                        assigned_val: RValue::Value(v),
+                        missing_sources: old,
                     });
-                } else {
-                    if let CfgInstruction::Assign { dest, val } = instr {
-                        malformed_assignments.push(SingleMalformedAssignmentInfo {
-                            bb_id: bb.id,
-                            dest_val: dest,
-                            assigned_val: val,
-                        });
-                    }
+                } else if let CfgInstruction::Assign { dest, val } = instr {
+                    removed_vals.insert(dest);
+                    // safe to propagate missing sources
+                    let old = match val {
+                        RValue::Value(v) => {
+                            // phi_missing_sources.get(&v).cloned().unwrap_or_default()
+                            BTreeSet::new()
+                        }
+                        RValue::_VarId(_) => {
+                            // variable use = missing from all predecessor blocks
+                            bb.predecessors.iter().copied().collect::<BTreeSet<BBId>>()
+                        }
+                        _ => unreachable!(),
+                    };
+                    // old.insert(bb.id);
+                    phi_missing_sources.insert(dest, old.clone());
+
+                    malformed_assignments.push(SingleMalformedAssignmentInfo {
+                        missing_sources: old,
+                        bb_id: bb.id,
+                        dest_val: dest,
+                        assigned_val: val,
+                    });
                     changed = true;
                 }
+            }
+
+            match &bb.tail {
+                TailCfgInstruction::CondBranch {
+                    cond: v,
+                    then_bb: _,
+                    else_bb: _,
+                }
+                | TailCfgInstruction::Return { value: Some(v) } => {
+                    if removed_vals.contains(v) && !malformed_tail_blocks.contains(&bb.id) {
+                        malformed_tails.push(SingleMalformedTailInfo {
+                            bb_id: bb.id,
+                            missing_sources: phi_missing_sources
+                                .get(v)
+                                .cloned()
+                                .unwrap_or_default(),
+                        });
+                        malformed_tail_blocks.insert(bb.id);
+                        bb.tail = TailCfgInstruction::Undefined;
+                        changed = true;
+                    }
+                }
+                _ => {}
             }
         }
         if !changed {
             break;
         }
     }
+
     MalformedPhiInfo {
+        blocks: blocks_clone,
         infos,
         malformed_assignments,
+        malformed_tails,
+        phi_assignments,
     }
 }

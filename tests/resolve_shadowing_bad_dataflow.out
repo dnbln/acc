@@ -1,7 +1,7 @@
 STDOUT:
 
 STDERR:
-CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(0), dest_val: ValueRef(3, 115..116, None), assigned_val: _VarId(VarId(0)) }] })
+CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(0), dest_val: ValueRef(4, 115..116, Some(VarId(0)), None), assigned_val: _VarId(VarId(0)), missing_sources: {} }], phi_assignments: [], malformed_tails: [SingleMalformedTailInfo { bb_id: BBId(0), missing_sources: {} }], blocks: [BasicBlock { id: BBId(0), phi: [], instructions: [Assign { dest: ValueRef(0, 8..119, Some(VarId(2)), None), val: Function { name: "main" } }, Assign { dest: ValueRef(1, 54..55, None, None), val: Const(5) }, Assign { dest: ValueRef(2, 83..85, None, None), val: Const(10) }, Assign { dest: ValueRef(3, 79..85, Some(VarId(1)), None), val: Value(ValueRef(2, 83..85, None, None)) }, Assign { dest: ValueRef(4, 115..116, Some(VarId(0)), None), val: _VarId(VarId(0)) }], tail: Return { value: Some(ValueRef(4, 115..116, Some(VarId(0)), None)) }, successors: [], predecessors: [] }] })
 error: Use before initialization detected during CFG lowering
    ┌─ tests/resolve_shadowing_bad_dataflow.c:11:12
    │
@@ -12,5 +12,10 @@ error: Use before initialization detected during CFG lowering
    │            ^ value not valid (not yet initialized)
    │
    = note: this means that you are trying to use a variable that has not been assigned a value yet
+
+---
+digraph MalformedPhiInfo {
+  BB0 [label="BB0:\n    %0 = function main (main)\n    %1 = const 5\n    %2 = const 10\n    %3 = %2 (x)\n    %4 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %4\n"];
+}
 
 Error: CFG lowering failed
