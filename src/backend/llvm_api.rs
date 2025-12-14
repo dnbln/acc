@@ -272,8 +272,12 @@ impl LLVMTarget {
     }
 
     pub fn new_default() -> Self {
-        Self::new_from_triple_internal(unsafe { target_machine::LLVMGetDefaultTargetTriple() })
+        Self::new_from_triple_internal(Self::get_default_triple())
             .expect("Default target triple doesn't exist")
+    }
+
+    fn get_default_triple() -> *const libc::c_char {
+        unsafe { target_machine::LLVMGetDefaultTargetTriple() }
     }
 
     pub fn new_from_triple(triple: &str) -> Result<Self, LLVMMessage> {
@@ -315,6 +319,12 @@ impl TargetMachine {
                 *target_triple,
             )
         })
+    }
+
+    pub fn new_default() -> Self {
+        let default_target = LLVMTarget::new_default();
+        let target_triple = LLVMTarget::get_default_triple();
+        Self::new_with_triple(default_target, target_triple)
     }
 
     pub fn new_with_triple(target: LLVMTarget, triple: *const libc::c_char) -> Self {

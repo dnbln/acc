@@ -240,7 +240,7 @@ impl Backend {
 
     pub fn optimize(&mut self) {
         llvm_api::LLVMTarget::init();
-        let tm = TargetMachine::new_from_triple("x86_64-apple-darwin");
+        let tm = TargetMachine::new_default();
 
         self.module.optimize(llvm_api::OptLevel::O3, &tm);
     }
