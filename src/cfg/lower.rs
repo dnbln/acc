@@ -15,7 +15,7 @@ use crate::{
     diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
     parser::{
         Expr, Function, Stmt,
-        ast::{Block, Program, VarId},
+        ast::{Block, VarId},
         operator::{BinaryOp, UnaryOp},
         span::{Span, Spanned},
     },
@@ -56,7 +56,6 @@ pub enum LowerError {
 }
 
 pub fn lower_ast_to_cfg(
-    program: &Program,
     ast: &Function,
     sema: &SemaResults,
     warnings: &mut Vec<CfgWarning>,
@@ -68,31 +67,6 @@ pub fn lower_ast_to_cfg(
     };
 
     let mut bb = entry;
-
-    // for def in program {
-    //     match &**def {
-    //         crate::parser::TopLevel::GlobalVar { .. } => {}
-    //         crate::parser::TopLevel::Function(f, var) => {
-    //             let v = builder.allocate_value(def.span, Some(*var));
-    //             builder.add_instruction(
-    //                 entry,
-    //                 CfgInstruction::Assign {
-    //                     dest: v,
-    //                     val: RValue::Function {
-    //                         name: f.name.node.clone(),
-    //                     },
-    //                 },
-    //             );
-    //             builder.add_instruction(
-    //                 entry,
-    //                 CfgInstruction::_AssignVar {
-    //                     var_id: *var,
-    //                     val: RValue::Value(v),
-    //                 },
-    //             );
-    //         }
-    //     }
-    // }
 
     for (param_index, (_, _, var_id)) in ast.params.iter().enumerate() {
         let v = builder.allocate_value(sema.var_span(*var_id), Some(*var_id));
@@ -1429,7 +1403,7 @@ impl MalformedPhiInfo {
                         }
                         writeln!(&mut s).unwrap();
                     }
-                    CfgInstruction::_AssignVar { var_id, val } => {
+                    CfgInstruction::_AssignVar { .. } => {
                         unreachable!()
                     }
                 }
@@ -1554,7 +1528,7 @@ fn malformed_phi_reduction(builder: &mut CfgBuilder, sema: &SemaResults) -> Malf
                 })
                 .collect::<Vec<_>>();
             for instr in malformed_instrs {
-                if let Some((dest, source_bb, v, var)) = CfgBuilder::is_optimized_phi(&instr) {
+                if let Some((dest, source_bb, v, _)) = CfgBuilder::is_optimized_phi(&instr) {
                     removed_vals.insert(dest);
                     // safe to propagate missing sources
                     let mut old = phi_missing_sources.get(&v).cloned().unwrap_or_default();

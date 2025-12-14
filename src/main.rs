@@ -145,17 +145,16 @@ fn main() -> Result<()> {
     for top_level in &program.items {
         match &**top_level {
             TopLevel::Function(func, var_id) => {
-                let cfg =
-                    match acc::cfg::lower::lower_ast_to_cfg(&program, func, &sema, &mut warnings) {
-                        Ok(cfg) => cfg,
-                        Err(error) => {
-                            eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
+                let cfg = match acc::cfg::lower::lower_ast_to_cfg(func, &sema, &mut warnings) {
+                    Ok(cfg) => cfg,
+                    Err(error) => {
+                        eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
 
-                            display_cfg_errors(&source, path.to_string_lossy(), &error, &sema);
+                        display_cfg_errors(&source, path.to_string_lossy(), &error, &sema);
 
-                            bail!("CFG lowering failed");
-                        }
-                    };
+                        bail!("CFG lowering failed");
+                    }
+                };
 
                 if args.cfg {
                     println!(
