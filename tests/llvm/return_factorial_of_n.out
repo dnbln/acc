@@ -1,0 +1,146 @@
+STDOUT:
+CFG for function factorial:
+BBId(0): % preds = []
+  %0 = param[0] [var n]
+  %2 = const 1
+  %3 = leq %0, %2
+  br_cond %3 ? BBId(1) : BBId(2)
+
+BBId(1): % preds = [BBId(0)]
+  %4 = const 1
+  return %4
+
+BBId(2): % preds = [BBId(0)]
+  %6 = function v1 [var factorial]
+  %8 = const 1
+  %9 = sub %0, %8
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+CFG for function main:
+BBId(0): % preds = []
+  %0 = const 0
+  %2 = const 10
+  %3 = lt %0, %2
+  br_cond %3 ? BBId(1) : BBId(2)
+
+BBId(1): % preds = [BBId(0)]
+  br BBId(3)
+
+BBId(2): % preds = [BBId(0)]
+  br BBId(3)
+
+BBId(3): % preds = [BBId(1), BBId(2)]
+  %23 = Φ(2@BB1, 3@BB2) [var result]
+  br BBId(4)
+
+BBId(4): % preds = [BBId(3), BBId(6)]
+  %24 = Φ(0@BB3, %17@BB6) [var i]
+  %27 = Φ(%23@BB3, %13@BB6) [var result]
+  %10 = const 3
+  %11 = lt %24, %10
+  br_cond %11 ? BBId(5) : BBId(7)
+
+BBId(5): % preds = [BBId(4)]
+  %13 = add %27, %24 [var result]
+  br BBId(6)
+
+BBId(6): % preds = [BBId(5)]
+  %16 = const 1
+  %17 = add %24, %16
+  br BBId(4)
+
+BBId(7): % preds = [BBId(4)]
+  %18 = function v1 [var factorial]
+  %20 = call %18(%27)
+  return %20
+
+
+Generated LLVM IR:
+; ModuleID = 'module'
+source_filename = "module"
+
+define i64 @factorial(i64 %0) {
+bb0:
+  %cmp = icmp sle i64 %0, 1
+  br i1 %cmp, label %bb1, label %bb2
+
+bb1:                                              ; preds = %bb0
+  ret i64 1
+
+bb2:                                              ; preds = %bb0
+  %sub = sub i64 %0, 1
+  %call = call i64 @factorial(i64 %sub)
+  %mul = mul i64 %0, %call
+  ret i64 %mul
+}
+
+define i64 @main() {
+bb0:
+  br i1 true, label %bb1, label %bb2
+
+bb1:                                              ; preds = %bb0
+  br label %bb3
+
+bb2:                                              ; preds = %bb0
+  br label %bb3
+
+bb3:                                              ; preds = %bb2, %bb1
+  %phi = phi i64 [ 2, %bb1 ], [ 3, %bb2 ]
+  br label %bb4
+
+bb4:                                              ; preds = %bb6, %bb3
+  %phi1 = phi i64 [ 0, %bb3 ], [ %add3, %bb6 ]
+  %phi2 = phi i64 [ %phi, %bb3 ], [ %add, %bb6 ]
+  %cmp = icmp slt i64 %phi1, 3
+  br i1 %cmp, label %bb5, label %bb7
+
+bb5:                                              ; preds = %bb4
+  %add = add i64 %phi2, %phi1
+  br label %bb6
+
+bb6:                                              ; preds = %bb5
+  %add3 = add i64 %phi1, 1
+  br label %bb4
+
+bb7:                                              ; preds = %bb4
+  %call = call i64 @factorial(i64 %phi2)
+  ret i64 %call
+}
+
+Optimized LLVM IR:
+; ModuleID = 'module'
+source_filename = "module"
+
+; Function Attrs: nofree norecurse nosync nounwind memory(none)
+define i64 @factorial(i64 %0) local_unnamed_addr #0 {
+bb0:
+  %cmp1 = icmp slt i64 %0, 2
+  br i1 %cmp1, label %common.ret, label %bb2
+
+common.ret:                                       ; preds = %bb2, %bb0
+  %accumulator.tr.lcssa = phi i64 [ 1, %bb0 ], [ %mul, %bb2 ]
+  ret i64 %accumulator.tr.lcssa
+
+bb2:                                              ; preds = %bb0, %bb2
+  %.tr3 = phi i64 [ %sub, %bb2 ], [ %0, %bb0 ]
+  %accumulator.tr2 = phi i64 [ %mul, %bb2 ], [ 1, %bb0 ]
+  %sub = add nsw i64 %.tr3, -1
+  %mul = mul i64 %.tr3, %accumulator.tr2
+  %cmp = icmp samesign ult i64 %.tr3, 3
+  br i1 %cmp, label %common.ret, label %bb2
+}
+
+; Function Attrs: mustprogress nofree norecurse nosync nounwind willreturn memory(none)
+define noundef i64 @main() local_unnamed_addr #1 {
+factorial.exit:
+  ret i64 120
+}
+
+attributes #0 = { nofree norecurse nosync nounwind memory(none) }
+attributes #1 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
+
+
+STDERR:

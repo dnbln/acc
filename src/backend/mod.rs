@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use crate::{
     backend::llvm_api::{
@@ -243,5 +244,12 @@ impl Backend {
         let tm = TargetMachine::new_default();
 
         self.module.optimize(llvm_api::OptLevel::O3, &tm);
+    }
+
+    pub fn write_bitcode_to_file(&self, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
+        let path = path.as_ref();
+        self.module
+            .write_bitcode_file(path)
+            .map_err(|e| anyhow::anyhow!("Failed to write LLVM bitcode to file {}", path.display()))
     }
 }

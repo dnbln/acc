@@ -40,6 +40,11 @@ struct Args {
     #[cfg(feature = "llvm-backend")]
     #[clap(long)]
     llvm_optimized_ir: bool,
+
+    /// Output the generated LLVM IR to the specified file
+    #[cfg(feature = "llvm-backend")]
+    #[clap(short = 'o', value_name = "FILE")]
+    llvm_output: Option<PathBuf>,
 }
 
 pub struct SemaTargetDisplay {
@@ -221,6 +226,10 @@ fn main() -> Result<()> {
         if args.llvm_optimized_ir {
             println!("Optimized LLVM IR:");
             backend.debug();
+        }
+
+        if let Some(p) = args.llvm_output {
+            backend.write_bitcode_to_file(&p)?;
         }
     }
 
