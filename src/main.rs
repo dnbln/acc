@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
+use acc::cfg::def::ControlFlowGraph;
 use acc::cfg::lower::LowerError;
 use acc::cfg::sema;
 use acc::diagnostics::{IntoDiagnostic, show_diagnostics, show_diagnostics_with_sema};
@@ -28,6 +30,16 @@ struct Args {
     /// Generate Graphviz DOT files for CFGs after lowering, under directory DIR
     #[clap(long, value_name = "DIR")]
     cfg_graphviz: Option<PathBuf>,
+
+    /// Display the generated LLVM IR
+    #[cfg(feature = "llvm-backend")]
+    #[clap(long)]
+    llvm_ir: bool,
+
+    /// Display the optimized LLVM IR
+    #[cfg(feature = "llvm-backend")]
+    #[clap(long)]
+    llvm_optimized_ir: bool,
 }
 
 pub struct SemaTargetDisplay {
@@ -127,24 +139,23 @@ fn main() -> Result<()> {
     }
 
     let mut warnings = Vec::new();
+
+    let mut program_cfgs = BTreeMap::<VarId, ControlFlowGraph>::new();
+
     for top_level in &program.items {
         match &**top_level {
-            TopLevel::Function(func, _) => {
-                let cfg = match acc::cfg::lower::lower_ast_to_cfg(
-                    &program.items,
-                    func,
-                    &sema,
-                    &mut warnings,
-                ) {
-                    Ok(cfg) => cfg,
-                    Err(error) => {
-                        eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
+            TopLevel::Function(func, var_id) => {
+                let cfg =
+                    match acc::cfg::lower::lower_ast_to_cfg(&program, func, &sema, &mut warnings) {
+                        Ok(cfg) => cfg,
+                        Err(error) => {
+                            eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);
 
-                        display_cfg_errors(&source, path.to_string_lossy(), &error, &sema);
+                            display_cfg_errors(&source, path.to_string_lossy(), &error, &sema);
 
-                        bail!("CFG lowering failed");
-                    }
-                };
+                            bail!("CFG lowering failed");
+                        }
+                    };
 
                 if args.cfg {
                     println!(
@@ -176,6 +187,8 @@ fn main() -> Result<()> {
                     })?;
                     println!("Wrote CFG Graphviz DOT file to {}", dot_filename.display());
                 }
+
+                program_cfgs.insert(*var_id, cfg);
             }
             _ => {}
         }
@@ -183,6 +196,33 @@ fn main() -> Result<()> {
 
     if !warnings.is_empty() {
         show_diagnostics(&source, path.to_string_lossy(), &warnings);
+    }
+
+    #[cfg(feature = "llvm-backend")]
+    {
+        let mut backend = acc::backend::Backend::new(sema);
+
+        backend.init_functions(&program);
+
+        for top_level in &program.items {
+            match &**top_level {
+                TopLevel::Function(func, var_id) => {
+                    let cfg = &program_cfgs[var_id];
+                    backend.lower_function(*var_id, &cfg);
+                }
+                _ => {}
+            }
+        }
+
+        if args.llvm_ir {
+            println!("Generated LLVM IR:");
+            backend.debug();
+        }
+        backend.optimize();
+        if args.llvm_optimized_ir {
+            println!("Optimized LLVM IR:");
+            backend.debug();
+        }
     }
 
     Ok(())

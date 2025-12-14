@@ -1,46 +1,46 @@
 STDOUT:
 CFG for function main:
 BBId(0): % preds = []
-  %1 = const 1
-  br_cond %1 ? BBId(1) : BBId(2)
+  %0 = const 1
+  br_cond %0 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]
-  %2 = const 0
-  return %2
+  %1 = const 0
+  return %1
 
 BBId(2): % preds = [BBId(0)]
-  %3 = const 1
-  br_cond %3 ? BBId(3) : BBId(4)
+  %2 = const 1
+  br_cond %2 ? BBId(3) : BBId(4)
 
 BBId(3): % preds = [BBId(2)]
-  %4 = const 0
-  return %4
+  %3 = const 0
+  return %3
 
 BBId(4): % preds = [BBId(2)]
   br BBId(5)
 
 BBId(5): % preds = [BBId(4)]
-  %5 = const 1
-  br_cond %5 ? BBId(6) : BBId(7)
+  %4 = const 1
+  br_cond %4 ? BBId(6) : BBId(7)
 
 BBId(6): % preds = [BBId(5)]
   br BBId(8)
 
 BBId(7): % preds = [BBId(5)]
-  %6 = const 0
-  return %6
+  %5 = const 0
+  return %5
 
 BBId(8): % preds = [BBId(6)]
-  %7 = const 1
-  br_cond %7 ? BBId(9) : BBId(10)
+  %6 = const 1
+  br_cond %6 ? BBId(9) : BBId(10)
 
 BBId(9): % preds = [BBId(8)]
-  %8 = const 0
-  return %8
+  %7 = const 0
+  return %7
 
 BBId(10): % preds = [BBId(8)]
-  %9 = const 0
-  return %9
+  %8 = const 0
+  return %8
 
 
 

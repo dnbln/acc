@@ -1,7 +1,7 @@
 STDOUT:
 
 STDERR:
-CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(0), dest_val: ValueRef(1, 43..44, Some(VarId(0)), None), assigned_val: _VarId(VarId(0)), missing_sources: {} }], phi_assignments: [], malformed_tails: [SingleMalformedTailInfo { bb_id: BBId(0), missing_sources: {} }], blocks: [BasicBlock { id: BBId(0), phi: [], instructions: [Assign { dest: ValueRef(0, 8..47, Some(VarId(1)), None), val: Function { name: "main" } }, Assign { dest: ValueRef(1, 43..44, Some(VarId(0)), None), val: _VarId(VarId(0)) }], tail: Return { value: Some(ValueRef(1, 43..44, Some(VarId(0)), None)) }, successors: [], predecessors: [] }] })
+CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(0), dest_val: ValueRef(0, 43..44, Some(VarId(0)), None), assigned_val: _VarId(VarId(0)), missing_sources: {} }], phi_assignments: [], malformed_tails: [SingleMalformedTailInfo { bb_id: BBId(0), missing_sources: {} }], blocks: [BasicBlock { id: BBId(0), phi: [], instructions: [Assign { dest: ValueRef(0, 43..44, Some(VarId(0)), None), val: _VarId(VarId(0)) }], tail: Return { value: Some(ValueRef(0, 43..44, Some(VarId(0)), None)) }, successors: [], predecessors: [] }] })
 error: Use before initialization detected during CFG lowering
   ┌─ tests/bad_dataflow_2.c:4:12
   │
@@ -14,7 +14,7 @@ error: Use before initialization detected during CFG lowering
 
 ---
 digraph MalformedPhiInfo {
-  BB0 [label="BB0:\n    %0 = function main (main)\n    %1 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %1\n"];
+  BB0 [label="BB0:\n    %0 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %0\n"];
 }
 
 Error: CFG lowering failed

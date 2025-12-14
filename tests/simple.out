@@ -51,19 +51,18 @@ Body: Some(
 )
 CFG for function main:
 BBId(0): % preds = []
-  %0 = function main [var main]
   br BBId(1)
 
 BBId(1): % preds = [BBId(0), BBId(2)]
-  %1 = const 1
-  br_cond %1 ? BBId(2) : BBId(3)
+  %0 = const 1
+  br_cond %0 ? BBId(2) : BBId(3)
 
 BBId(2): % preds = [BBId(1)]
   br BBId(1)
 
 BBId(3): % preds = [BBId(1)]
-  %2 = const 0
-  return %2
+  %1 = const 0
+  return %1
 
 
 

@@ -10,12 +10,26 @@ clap = { version = "4.5.53", features = ["derive"] }
 codespan-reporting = "0.13.1"
 logos = "0.15.1"
 thiserror = "2.0"
+llvm-sys = { version = "211.0.0", default-features = false, optional = true }
+libc = { version = "0.2.178", optional = true }
 
 [dev-dependencies]
 libtest-mimic = "0.5.0"
+
+[features]
+default = [
+    # "llvm-backend"
+]
+llvm-backend = ["dep:llvm-sys", "llvm-sys/force-static", "dep:libc"]
 
 [[test]]
 name = "tests"
 path = "src/test_harness.rs"
 harness = false
 
+
+[[test]]
+name = "llvm-tests"
+path = "src/test_harness_llvm.rs"
+harness = false
+required-features = ["llvm-backend"]

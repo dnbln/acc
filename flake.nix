@@ -19,6 +19,7 @@
           buildInputs = [
             pkg-config
             libiconvReal
+            zlib
           ];
         };
       }

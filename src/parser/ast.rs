@@ -10,6 +10,7 @@ pub enum Type {
     Int,
     Float,
     Char,
+    Bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

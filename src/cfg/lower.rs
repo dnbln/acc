@@ -15,7 +15,7 @@ use crate::{
     diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
     parser::{
         Expr, Function, Stmt,
-        ast::{Block, VarId},
+        ast::{Block, Program, VarId},
         operator::{BinaryOp, UnaryOp},
         span::{Span, Spanned},
     },
@@ -56,7 +56,7 @@ pub enum LowerError {
 }
 
 pub fn lower_ast_to_cfg(
-    program: &Vec<Spanned<crate::parser::TopLevel>>,
+    program: &Program,
     ast: &Function,
     sema: &SemaResults,
     warnings: &mut Vec<CfgWarning>,
@@ -69,30 +69,30 @@ pub fn lower_ast_to_cfg(
 
     let mut bb = entry;
 
-    for def in program {
-        match &**def {
-            crate::parser::TopLevel::GlobalVar { .. } => {}
-            crate::parser::TopLevel::Function(f, var) => {
-                let v = builder.allocate_value(def.span, Some(*var));
-                builder.add_instruction(
-                    entry,
-                    CfgInstruction::Assign {
-                        dest: v,
-                        val: RValue::Function {
-                            name: f.name.node.clone(),
-                        },
-                    },
-                );
-                builder.add_instruction(
-                    entry,
-                    CfgInstruction::_AssignVar {
-                        var_id: *var,
-                        val: RValue::Value(v),
-                    },
-                );
-            }
-        }
-    }
+    // for def in program {
+    //     match &**def {
+    //         crate::parser::TopLevel::GlobalVar { .. } => {}
+    //         crate::parser::TopLevel::Function(f, var) => {
+    //             let v = builder.allocate_value(def.span, Some(*var));
+    //             builder.add_instruction(
+    //                 entry,
+    //                 CfgInstruction::Assign {
+    //                     dest: v,
+    //                     val: RValue::Function {
+    //                         name: f.name.node.clone(),
+    //                     },
+    //                 },
+    //             );
+    //             builder.add_instruction(
+    //                 entry,
+    //                 CfgInstruction::_AssignVar {
+    //                     var_id: *var,
+    //                     val: RValue::Value(v),
+    //                 },
+    //             );
+    //         }
+    //     }
+    // }
 
     for (param_index, (_, _, var_id)) in ast.params.iter().enumerate() {
         let v = builder.allocate_value(sema.var_span(*var_id), Some(*var_id));
@@ -134,6 +134,8 @@ pub fn lower_ast_to_cfg(
     }
     builder.trim_dead_blocks();
 
+    resolve_function_refs(&mut builder, sema);
+
     phi_insertion(&mut builder, sema);
     assignment_removal(&mut builder);
 
@@ -148,6 +150,19 @@ pub fn lower_ast_to_cfg(
     match builder.build(entry) {
         Ok(cfg) => Ok(cfg),
         Err(e) => Err(LowerError::CfgValidationErrors(e)),
+    }
+}
+
+fn resolve_function_refs(builder: &mut CfgBuilder, sema: &SemaResults) {
+    for block in &mut builder.blocks {
+        for instr in &mut block.instructions {
+            if let CfgInstruction::Assign { dest: _, val } = instr
+                && let RValue::_VarId(v_id) = val
+                && sema.var_types[v_id].is_function()
+            {
+                *val = RValue::Function { var_id: *v_id };
+            }
+        }
     }
 }
 

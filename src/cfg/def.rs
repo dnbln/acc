@@ -5,17 +5,17 @@ use std::collections::BTreeMap;
 use crate::parser::{ast::VarId, span::Span};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct BBId(pub(super) usize);
+pub struct BBId(pub(crate) usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BasicBlock {
-    pub(super) id: BBId,
+    pub(crate) id: BBId,
     /// Phi instructions at the start of the basic block
-    pub(super) phi: Vec<PhiCfgInstruction>,
+    pub(crate) phi: Vec<PhiCfgInstruction>,
     /// Actual instructions in the basic block
-    pub(super) instructions: Vec<CfgInstruction>,
+    pub(crate) instructions: Vec<CfgInstruction>,
     /// Tail instruction (branch/return)
-    pub(super) tail: TailCfgInstruction,
+    pub(crate) tail: TailCfgInstruction,
     /// Successor basic blocks (determined from tail instruction)
     pub(super) successors: Vec<BBId>,
     /// Predecessor basic blocks (determined from successors of all blocks)
@@ -23,7 +23,7 @@ pub struct BasicBlock {
 }
 
 #[derive(Clone, Copy, Eq, Ord, Hash, Debug)]
-pub struct ValueRef(pub(super) usize, pub(super) Span, pub(super) Option<VarId>, pub(super) Option<BBId>);
+pub struct ValueRef(pub(crate) usize, pub(super) Span, pub(crate) Option<VarId>, pub(super) Option<BBId>);
 
 impl PartialEq for ValueRef {
     fn eq(&self, other: &Self) -> bool {
@@ -70,7 +70,7 @@ pub enum RValue {
         param_index: usize,
     },
     Function {
-        name: String,
+        var_id: VarId,
     },
     Value(ValueRef),
     /// Direct variable reference, temporary representation before / during SSA conversion

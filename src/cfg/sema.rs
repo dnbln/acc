@@ -6,17 +6,41 @@ use std::collections::BTreeMap;
 use crate::{
     diagnostics::IntoDiagnostic,
     parser::{
-        TopLevel,
+        TopLevel, Type,
         ast::{Block, Expr, Function, Program, RefId, Stmt, VarId},
         span::{Span, Spanned},
     },
 };
+
+pub enum VarType {
+    Int,
+    Float,
+    Char,
+    Bool,
+    Function(Vec<Type>, Type),
+}
+
+impl VarType {
+    pub fn from_ast_type(type_name: &Type) -> Self {
+        match type_name {
+            Type::Int => VarType::Int,
+            Type::Float => VarType::Float,
+            Type::Char => VarType::Char,
+            Type::Bool => VarType::Bool,
+        }
+    }
+
+    pub fn is_function(&self) -> bool {
+        matches!(self, VarType::Function(_, _))
+    }
+}
 
 pub struct SemaResults {
     pub m: BTreeMap<RefId, VarId>,
     pub refs: BTreeMap<RefId, Span>,
     pub vars: BTreeMap<VarId, Span>,
     pub var_names: BTreeMap<VarId, String>,
+    pub var_types: BTreeMap<VarId, VarType>,
 }
 
 impl SemaResults {
@@ -25,11 +49,18 @@ impl SemaResults {
         self.refs.insert(ref_id, ref_span);
     }
 
-    fn add_declaration(&mut self, var_id: VarId, var_span: Span, var_name: Option<String>) {
+    fn add_declaration(
+        &mut self,
+        var_id: VarId,
+        var_span: Span,
+        var_name: Option<String>,
+        var_type: VarType,
+    ) {
         self.vars.insert(var_id, var_span);
         if let Some(name) = var_name {
             self.var_names.insert(var_id, name);
         }
+        self.var_types.insert(var_id, var_type);
     }
 
     pub fn lookup_ref_id(&self, ref_id: RefId) -> Option<VarId> {
@@ -120,6 +151,7 @@ pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
         refs: BTreeMap::new(),
         vars: BTreeMap::new(),
         var_names: BTreeMap::new(),
+        var_types: BTreeMap::new(),
     };
     let mut sema_errors = Vec::new();
 
@@ -130,13 +162,28 @@ pub fn sema(ast: &Program) -> Result<SemaResults, Vec<SemaError>> {
         };
         for item in ast.items.iter() {
             match &**item {
-                TopLevel::GlobalVar { name, id, span, .. } => {
+                TopLevel::GlobalVar {
+                    name, id, span, ty, ..
+                } => {
                     top_level_names.vars.insert(name.node.clone(), *id);
-                    sema.add_declaration(*id, span.clone(), Some(name.node.clone()));
+                    sema.add_declaration(
+                        *id,
+                        span.clone(),
+                        Some(name.node.clone()),
+                        VarType::from_ast_type(&ty.node),
+                    );
                 }
                 TopLevel::Function(f, id) => {
                     top_level_names.vars.insert(f.name.node.clone(), *id);
-                    sema.add_declaration(*id, f.name.span, Some(f.name.node.clone()));
+                    let param_types: Vec<Type> =
+                        f.params.iter().map(|(ty, _, _)| ty.node.clone()).collect();
+                    let return_type = f.return_type.node.clone();
+                    sema.add_declaration(
+                        *id,
+                        f.name.span,
+                        Some(f.name.node.clone()),
+                        VarType::Function(param_types, return_type),
+                    );
                 }
             }
         }
@@ -176,9 +223,14 @@ fn sema_function(
         let mut base_frame = SemaStackFrame {
             vars: BTreeMap::new(),
         };
-        for (_, name, var_id) in &ast.params {
+        for (ty, name, var_id) in &ast.params {
             base_frame.vars.insert(name.node.clone(), *var_id);
-            sema.add_declaration(*var_id, name.span, Some(name.node.clone()));
+            sema.add_declaration(
+                *var_id,
+                name.span,
+                Some(name.node.clone()),
+                VarType::from_ast_type(&ty.node),
+            );
         }
         stack.frames.push(base_frame);
     }
@@ -215,7 +267,7 @@ fn sema_stmt(
         Stmt::Block(block) => {
             sema_block(block, sema, stack, sema_errors);
         }
-        Stmt::VarDecl { id, name, init, .. } => {
+        Stmt::VarDecl { id, name, init, ty } => {
             // first sema the initializer expression (if any), so that we cannot reference ourselves in the initializer
             if let Some(init_expr) = init {
                 sema_expr(init_expr, sema, stack, sema_errors);
@@ -236,7 +288,12 @@ fn sema_stmt(
                 });
             }
 
-            sema.add_declaration(*id, name.span, Some(name.node.clone()));
+            sema.add_declaration(
+                *id,
+                name.span,
+                Some(name.node.clone()),
+                VarType::from_ast_type(&ty.node),
+            );
         }
         Stmt::Expr(spanned) => {
             sema_expr(spanned, sema, stack, sema_errors);

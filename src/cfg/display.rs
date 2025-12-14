@@ -174,8 +174,8 @@ impl Display for RValue {
             RValue::Param { param_index } => {
                 write!(f, "param[{}]", param_index)
             }
-            RValue::Function { name } => {
-                write!(f, "function {}", name)
+            RValue::Function { var_id } => {
+                write!(f, "function {}", var_id)
             }
             RValue::Value(value_ref) => {
                 write!(f, "{}", value_ref)
