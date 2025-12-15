@@ -4,15 +4,14 @@ BBId(0): % preds = []
   %0 = param[0] [var n]
   %2 = const.i64 1
   %3 = leq %0, %2
-  %14 = const.i64 1
   br_cond %3 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]
-  return %14
+  return %2
 
 BBId(2): % preds = [BBId(0)]
   %6 = function v1 [var factorial]
-  %9 = sub %0, %14
+  %9 = sub %0, %2
   %10 = call %6(%9)
   %11 = mul %0, %10
   return %11
@@ -50,8 +49,8 @@ BBId(5): % preds = [BBId(4)]
 
 BBId(6): % preds = [BBId(4)]
   %49 = function v1 [var factorial]
-  %50 = call %49(%33)
-  return %50
+  %51 = call %49(%33)
+  return %51
 
 
 Generated LLVM IR:

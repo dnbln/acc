@@ -221,7 +221,7 @@ fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<
             for instr in bb.instructions.iter().rev() {
                 match instr {
                     CfgInstruction::Assign { dest, val } => {
-                        if matches!(val, RValue::Call { .. }) && !mark_calls {
+                        if matches!(val, RValue::Call { .. }) && mark_calls {
                             // function calls are assumed to have side effects, so their dest is always live
                             if !live_values.contains(dest) {
                                 live_values.insert(*dest);
@@ -517,13 +517,167 @@ fn block_inliner(builder: &mut CfgBuilder) {
     }
 }
 
+fn compute_dominated(builder: &CfgBuilder, start_bb: BBId, dominated: &mut BTreeSet<BBId>) {
+    dominated.insert(start_bb);
+
+    for succ in &builder.blocks[start_bb.0].successors {
+        if !dominated.contains(&succ) {
+            compute_dominated(builder, *succ, dominated);
+        }
+    }
+}
+
+fn compute_ascendants(builder: &CfgBuilder, ascendents: &mut BTreeSet<BBId>) -> Option<BBId> {
+    // Last inserted = most upstream block
+    let mut last_inserted = None;
+
+    loop {
+        let mut to_insert = None;
+        for bb in &*ascendents {
+            for pred in &builder.blocks[bb.0].predecessors {
+                if !ascendents.contains(pred) {
+                    to_insert = Some(*pred);
+                    break;
+                }
+            }
+        }
+        if let Some(bb_id) = to_insert {
+            ascendents.insert(bb_id);
+            last_inserted = Some(bb_id);
+        } else {
+            break;
+        }
+    }
+
+    last_inserted
+}
+
+fn dominated_sets(builder: &CfgBuilder) -> BTreeMap<BBId, BTreeSet<BBId>> {
+    let mut doms_map = BTreeMap::<BBId, BTreeSet<BBId>>::new();
+
+    for bb in &builder.blocks {
+        let mut dominated = BTreeSet::<BBId>::new();
+        compute_dominated(builder, bb.id, &mut dominated);
+        doms_map.insert(bb.id, dominated);
+    }
+
+    doms_map
+}
+
+// fn dominators(builder: &CfgBuilder) -> BTreeMap<BBId, BTreeSet<BBId>> {
+//     let doms_map = dominated_sets(builder);
+//     let mut dominators_map = BTreeMap::<BBId, BTreeSet<BBId>>::new();
+
+//     for bb in &builder.blocks {
+//         let mut dominators = BTreeSet::<BBId>::new();
+//         for (other_bb_id, dominated_set) in &doms_map {
+//             if dominated_set.contains(&bb.id) && other_bb_id != &bb.id {
+//                 dominators.insert(*other_bb_id);
+//             }
+//         }
+//         dominators_map.insert(bb.id, dominators);
+//     }
+
+//     dominators_map
+// }
+
 fn hoist_pass(builder: &mut CfgBuilder) {
     // attempt to hoist reused (sub-)expressions out of ifs
     // It works similar to LLVM's GVN pass, but only for identical expressions
     // and only hoisting out of branches
 
+    let mut doms = dominated_sets(builder);
+
     loop {
         let mut changed = false;
+        let mut exprs = BTreeMap::<RValue, Vec<(BBId, ValueRef)>>::new();
+
+        for bb in &builder.blocks {
+            for instr in &bb.instructions {
+                if let CfgInstruction::Assign { dest, val } = instr
+                    // only hoist pure RValues, calls may have side effects
+                    && !matches!(val, RValue::Call { .. })
+                {
+                    exprs.entry(val.clone()).or_default().push((bb.id, *dest));
+                }
+            }
+        }
+
+        let mut removed_vals = Vec::new();
+
+        for (rvalue, uses) in &exprs {
+            if uses.len() < 2 {
+                continue;
+            }
+
+            let mut init_set = BTreeSet::<BBId>::new();
+            let mut asc_map = BTreeSet::<BBId>::new();
+            for (bb_id, _) in uses {
+                init_set.insert(*bb_id);
+                asc_map.insert(*bb_id);
+            }
+            compute_ascendants(builder, &mut asc_map);
+            let mut candidates = asc_map
+                .iter()
+                .filter(|bb_id| {
+                    let dominated = &doms[bb_id];
+                    let mut count = 0;
+                    for (use_bb_id, _) in uses {
+                        if dominated.contains(use_bb_id) {
+                            count += 1;
+                        }
+                    }
+                    count == uses.len()
+                })
+                .copied()
+                .collect::<Vec<BBId>>();
+            if candidates.is_empty() {
+                continue;
+            }
+            // pick the most downstream candidate
+            let mut best_candidate = *candidates.first().unwrap();
+            for candidate in &candidates[1..] {
+                if doms[&best_candidate].contains(candidate) {
+                    best_candidate = *candidate;
+                }
+            }
+
+            if let Some(v) = uses.iter().find(|it| it.0 == best_candidate) {
+                // already computed in the best candidate block, reuse in all other blocks
+                for (_, use_dest) in uses {
+                    if use_dest != &v.1 {
+                        builder.replace_value(*use_dest, v.1);
+                        changed = true;
+                        removed_vals.push(*use_dest);
+                    }
+                }
+                continue;
+            }
+
+            // println!(
+            //     "Hoisting expression {:?} from {:?} to {:?}",
+            //     rvalue, uses, best_candidate
+            // );
+
+            // create a new value in the best_candidate block
+            let first_use = &uses[0];
+            let new_dest = builder.allocate_value(first_use.1.1, first_use.1.2);
+            builder.add_instruction(
+                best_candidate,
+                CfgInstruction::Assign {
+                    dest: new_dest,
+                    val: rvalue.clone(),
+                },
+            );
+
+            // replace uses in all use blocks
+            for (_, use_dest) in uses {
+                builder.replace_value(*use_dest, new_dest);
+                removed_vals.push(*use_dest);
+            }
+            changed = true;
+        }
+
         let mut to_hoist = Vec::new();
         for bb in &builder.blocks {
             if let TailCfgInstruction::CondBranch {
@@ -598,14 +752,15 @@ fn hoist_pass(builder: &mut CfgBuilder) {
             builder.replace_value(then_dest, new_dest);
             builder.replace_value(else_dest, new_dest);
 
+            removed_vals.push(then_dest);
+            removed_vals.push(else_dest);
+
             changed = true;
         }
 
         if changed {
-            dead_value_elimination(builder, true);
-        }
-
-        if !changed {
+            builder.remove_dead_values(&removed_vals);
+        } else {
             break;
         }
     }
@@ -674,14 +829,22 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
     }
 
     constant_propagation(builder);
-    dead_value_elimination(builder, false);
+    dead_value_elimination(builder, true);
     block_inliner(builder);
 
     hoist_pass(builder);
+    loop {
+        let mut changed = false;
+        changed |= phi_simplification(builder);
+        changed |= val_inliner(builder);
+        if !changed {
+            break;
+        }
+    }
 
     block_dedup(builder);
     tail_unification(builder);
-    dead_value_elimination(builder, false);
+    dead_value_elimination(builder, true);
     builder.trim_dead_blocks();
     block_inliner(builder);
 }

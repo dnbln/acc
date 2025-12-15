@@ -509,6 +509,19 @@ impl CfgBuilder {
         }
     }
 
+    pub(super) fn remove_dead_values(&mut self, dead_values: &Vec<ValueRef>) {
+        let dead_set: BTreeSet<_> = dead_values.iter().cloned().collect();
+
+        for bb in &mut self.blocks {
+            bb.phi.retain(|phi| !dead_set.contains(&phi.dest));
+
+            bb.instructions.retain(|instr| match instr {
+                CfgInstruction::Assign { dest, .. } => !dead_set.contains(dest),
+                CfgInstruction::_AssignVar { .. } => unreachable!(),
+            });
+        }
+    }
+
     pub(super) fn dedup_blocks(&mut self, bb_map: &BTreeMap<BBId, Vec<BBId>>) {
         for (bb_src, bb_dup) in bb_map {
             for bb_dup in bb_dup {

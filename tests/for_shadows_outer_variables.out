@@ -13,8 +13,7 @@ BBId(1): % preds = [BBId(0), BBId(2)]
 BBId(2): % preds = [BBId(1)]
   %5 = const.i64 1
   %6 = add %13, %5 [var i]
-  %9 = const.i64 1
-  %10 = add %6, %9
+  %10 = add %6, %5
   br BBId(1)
 
 BBId(3): % preds = [BBId(1)]
