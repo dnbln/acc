@@ -644,7 +644,7 @@ fn block_dedup(builder: &mut CfgBuilder) {
     builder.dedup_blocks(&block_map);
 }
 
-fn tail_unifyification(builder: &mut CfgBuilder) {
+fn tail_unification(builder: &mut CfgBuilder) {
     for bb in &mut builder.blocks {
         if let TailCfgInstruction::CondBranch {
             cond,
@@ -677,7 +677,7 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
     hoist_pass(builder);
 
     block_dedup(builder);
-    tail_unifyification(builder);
+    tail_unification(builder);
     dead_value_elimination(builder, false);
     builder.trim_dead_blocks();
     block_inliner(builder);
