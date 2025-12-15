@@ -1,0 +1,67 @@
+STDOUT:
+CFG for function f:
+BBId(0): % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = gt %0, %1
+  br_cond %4 ? BBId(1) : BBId(4)
+
+BBId(1): % preds = [BBId(0)]
+  %7 = neq %0, %1
+  br_cond %7 ? BBId(3) : BBId(2)
+
+BBId(2): % preds = [BBId(1)]
+  %9 = const.i64 0
+  %10 = gt %1, %9
+  br BBId(3)
+
+BBId(3): % preds = [BBId(1), BBId(2)]
+  %11 = Φ(true@BB1, %10@BB2)
+  br BBId(4)
+
+BBId(4): % preds = [BBId(0), BBId(3)]
+  %12 = Φ(false@BB0, %11@BB3)
+  return %12
+
+
+Generated LLVM IR:
+; ModuleID = 'module'
+source_filename = "module"
+
+define i1 @f(i64 %0, i64 %1) {
+bb0:
+  %cmp = icmp sgt i64 %0, %1
+  br i1 %cmp, label %bb1, label %bb4
+
+bb1:                                              ; preds = %bb0
+  %cmp1 = icmp ne i64 %0, %1
+  br i1 %cmp1, label %bb3, label %bb2
+
+bb2:                                              ; preds = %bb1
+  %cmp2 = icmp sgt i64 %1, 0
+  br label %bb3
+
+bb3:                                              ; preds = %bb2, %bb1
+  %phi = phi i1 [ true, %bb1 ], [ %cmp2, %bb2 ]
+  br label %bb4
+
+bb4:                                              ; preds = %bb3, %bb0
+  %phi3 = phi i1 [ false, %bb0 ], [ %phi, %bb3 ]
+  ret i1 %phi3
+}
+
+Optimized LLVM IR:
+; ModuleID = 'module'
+source_filename = "module"
+
+; Function Attrs: mustprogress nofree norecurse nosync nounwind willreturn memory(none)
+define i1 @f(i64 %0, i64 %1) local_unnamed_addr #0 {
+bb0:
+  %cmp = icmp sgt i64 %0, %1
+  ret i1 %cmp
+}
+
+attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
+
+
+STDERR:

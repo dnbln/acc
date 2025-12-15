@@ -18,7 +18,7 @@ libtest-mimic = "0.5.0"
 
 [features]
 default = [
-    # "llvm-backend"
+    "llvm-backend"
 ]
 llvm-backend = ["dep:llvm-sys", "llvm-sys/force-static", "dep:libc"]
 

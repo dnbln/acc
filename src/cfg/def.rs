@@ -23,7 +23,12 @@ pub struct BasicBlock {
 }
 
 #[derive(Clone, Copy, Eq, Ord, Hash, Debug)]
-pub struct ValueRef(pub(crate) usize, pub(super) Span, pub(crate) Option<VarId>, pub(super) Option<BBId>);
+pub struct ValueRef(
+    pub(crate) usize,
+    pub(super) Span,
+    pub(crate) Option<VarId>,
+    pub(super) Option<BBId>,
+);
 
 impl PartialEq for ValueRef {
     fn eq(&self, other: &Self) -> bool {
@@ -42,12 +47,21 @@ pub struct PhiCfgInstruction {
     pub dest: ValueRef,
     pub sources: BTreeMap<BBId, ValueRefOrConst>,
     pub var_id: Option<VarId>,
+    pub phi_type: PhiType,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PhiType {
+    Bool,
+    Int,
+    Infer,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueRefOrConst {
     Value(ValueRef),
     Const(i64),
+    ConstBool(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +80,7 @@ pub enum CfgInstruction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RValue {
     Const(i64),
+    ConstBool(bool),
     Param {
         param_index: usize,
     },
@@ -153,6 +168,7 @@ impl RValue {
         match v {
             ValueRefOrConst::Value(val_ref) => RValue::Value(*val_ref),
             ValueRefOrConst::Const(c) => RValue::Const(*c),
+            ValueRefOrConst::ConstBool(b) => RValue::ConstBool(*b),
         }
     }
 }
@@ -178,4 +194,3 @@ pub struct ControlFlowGraph {
     pub basic_blocks: Vec<BasicBlock>,
     pub entry: BBId,
 }
-

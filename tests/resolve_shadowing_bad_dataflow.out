@@ -15,7 +15,7 @@ error: Use before initialization detected during CFG lowering
 
 ---
 digraph MalformedPhiInfo {
-  BB0 [label="BB0:\n    %0 = const 5\n    %1 = const 10\n    %2 = %1 (x)\n    %3 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %3\n"];
+  BB0 [label="BB0:\n    %0 = const.i64 5\n    %1 = const.i64 10\n    %2 = %1 (x)\n    %3 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %3\n"];
 }
 
 Error: CFG lowering failed

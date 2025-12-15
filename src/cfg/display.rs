@@ -161,6 +161,9 @@ impl Display for ValueRefOrConst {
             ValueRefOrConst::Const(c) => {
                 write!(f, "{}", c)
             }
+            ValueRefOrConst::ConstBool(b) => {
+                write!(f, "{}", b)
+            }
         }
     }
 }
@@ -169,7 +172,10 @@ impl Display for RValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RValue::Const(c) => {
-                write!(f, "const {}", c)
+                write!(f, "const.i64 {}", c)
+            }
+            RValue::ConstBool(b) => {
+                write!(f, "const.i1 {}", b)
             }
             RValue::Param { param_index } => {
                 write!(f, "param[{}]", param_index)

@@ -146,6 +146,10 @@ impl Parser {
                 self.advance();
                 Type::Char
             }
+            TokenKind::Bool => {
+                self.advance();
+                Type::Bool
+            }
             _ => {
                 return Err(ParseError::new(
                     ParseErrorKind::ExpectedType {

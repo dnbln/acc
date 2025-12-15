@@ -51,11 +51,13 @@ impl CfgBuilder {
         dest: ValueRef,
         sources: BTreeMap<BBId, ValueRefOrConst>,
         var_id: Option<VarId>,
+        phi_type: PhiType,
     ) {
         self.blocks[bb_id.0].phi.push(PhiCfgInstruction {
             dest,
             sources,
             var_id,
+            phi_type,
         });
     }
 
@@ -86,6 +88,7 @@ impl CfgBuilder {
         var_id: VarId,
         sources: BTreeMap<BBId, ValueRefOrConst>,
         span: Span,
+        phi_type: PhiType,
     ) -> (ValueRef, bool) {
         let bb = &mut self.blocks[bb_id.0];
 
@@ -128,6 +131,7 @@ impl CfgBuilder {
                     dest,
                     sources,
                     var_id: Some(var_id),
+                    phi_type,
                 });
                 (dest, true)
             }

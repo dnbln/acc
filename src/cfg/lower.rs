@@ -752,35 +752,37 @@ fn lower_expr(
             ),
             BinaryOp::And => {
                 let left_val = lower_expr(builder, bb, left, sema, semantic_errors);
-                let mut right_eval_block = builder.create_bb();
+                let right_eval_block_init = builder.create_bb();
+                let mut right_eval_block = right_eval_block_init;
+                // Lower right expression in its own block
+                let right_val =
+                    lower_expr(builder, &mut right_eval_block, right, sema, semantic_errors);
                 let exit_bb = builder.create_bb();
-                let result_val = builder.allocate_value(root.span, None);
                 builder.set_tail_instruction(
                     *bb,
                     TailCfgInstruction::CondBranch {
                         cond: left_val,
-                        then_bb: right_eval_block,
+                        then_bb: right_eval_block_init,
                         else_bb: exit_bb,
                     },
                 );
-                // Lower right expression in its own block
-                let right_val =
-                    lower_expr(builder, &mut right_eval_block, right, sema, semantic_errors);
                 builder.set_tail_instruction(
                     right_eval_block,
                     TailCfgInstruction::UncondBranch { target: exit_bb },
                 );
                 // In exit block, create phi instruction to select correct value
+                let result_val = builder.allocate_value(root.span, None);
                 builder.add_phi_instruction(
                     exit_bb,
                     result_val,
                     [
-                        (*bb, ValueRefOrConst::Const(0)), // false if left was false
+                        (*bb, ValueRefOrConst::ConstBool(false)),
                         (right_eval_block, ValueRefOrConst::Value(right_val)), // right value
                     ]
                     .into_iter()
                     .collect(),
                     None,
+                    PhiType::Bool,
                 );
                 *bb = exit_bb;
 
@@ -788,35 +790,37 @@ fn lower_expr(
             }
             BinaryOp::Or => {
                 let left_val = lower_expr(builder, bb, left, sema, semantic_errors);
-                let mut right_eval_block = builder.create_bb();
+                let right_eval_block_init = builder.create_bb();
+                let mut right_eval_block = right_eval_block_init;
+                // Lower right expression in its own block
+                let right_val =
+                    lower_expr(builder, &mut right_eval_block, right, sema, semantic_errors);
                 let exit_bb = builder.create_bb();
-                let result_val = builder.allocate_value(root.span, None);
                 builder.set_tail_instruction(
                     *bb,
                     TailCfgInstruction::CondBranch {
                         cond: left_val,
                         then_bb: exit_bb,
-                        else_bb: right_eval_block,
+                        else_bb: right_eval_block_init,
                     },
                 );
-                // Lower right expression in its own block
-                let right_val =
-                    lower_expr(builder, &mut right_eval_block, right, sema, semantic_errors);
                 builder.set_tail_instruction(
                     right_eval_block,
                     TailCfgInstruction::UncondBranch { target: exit_bb },
                 );
                 // In exit block, create phi instruction to select correct value
+                let result_val = builder.allocate_value(root.span, None);
                 builder.add_phi_instruction(
                     exit_bb,
                     result_val,
                     [
-                        (*bb, ValueRefOrConst::Const(1)), // true if left was true
+                        (*bb, ValueRefOrConst::ConstBool(true)), // true if left was true
                         (right_eval_block, ValueRefOrConst::Value(right_val)), // right value
                     ]
                     .into_iter()
                     .collect(),
                     None,
+                    PhiType::Bool,
                 );
                 *bb = exit_bb;
 
@@ -1091,6 +1095,7 @@ fn lower_expr(
                 .into_iter()
                 .collect(),
                 None,
+                PhiType::Int,
             );
             *bb = exit_bb;
             result_val
@@ -1166,7 +1171,7 @@ fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
 
     for (block, phi) in phis {
         for (var_id, sources) in phi {
-            let (v, _) = builder.add_phi_source(block, var_id, sources, sema.var_span(var_id));
+            let (v, _) = builder.add_phi_source(block, var_id, sources, sema.var_span(var_id), PhiType::Infer);
             before_vars.entry(var_id).or_default().insert(block, v);
         }
     }
@@ -1207,7 +1212,7 @@ fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
         // propagate variables
         for (block, phi) in phis_to_add {
             for (var_id, sources) in phi {
-                let (v, ch) = builder.add_phi_source(block, var_id, sources, sema.var_span(var_id));
+                let (v, ch) = builder.add_phi_source(block, var_id, sources, sema.var_span(var_id), PhiType::Infer);
                 before_vars.entry(var_id).or_default().insert(block, v);
                 changed |= ch;
             }

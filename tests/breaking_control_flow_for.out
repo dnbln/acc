@@ -7,7 +7,7 @@ BBId(1): % preds = [BBId(0)]
   br BBId(2)
 
 BBId(2): % preds = [BBId(1)]
-  %0 = const 0
+  %0 = const.i64 0
   return %0
 
 

@@ -28,6 +28,8 @@ pub enum TokenKind {
     Float,
     #[token("char")]
     Char,
+    #[token("bool")]
+    Bool,
 
     // Literals
     #[regex(r"[0-9]+\.[0-9]+", |lex| lex.slice().parse::<f64>().ok())]
@@ -210,6 +212,7 @@ impl TokenKind {
             TokenKind::Int => "'int'",
             TokenKind::Float => "'float'",
             TokenKind::Char => "'char'",
+            TokenKind::Bool => "'bool'",
             TokenKind::FloatLit(_) => "float literal",
             TokenKind::IntLit(_) => "integer literal",
             TokenKind::CharLit(_) => "character literal",

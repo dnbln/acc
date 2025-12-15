@@ -5,7 +5,7 @@ BBId(0): % preds = []
   %1 = param[1] [var b]
   %4 = add %0, %1
   %7 = mul %0, %1
-  %8 = const 1
+  %8 = const.i64 1
   br_cond %8 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]

@@ -1,7 +1,7 @@
 STDOUT:
 CFG for function main:
 BBId(0): % preds = []
-  %0 = const 0
+  %0 = const.i64 0
   return %0
 
 

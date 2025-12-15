@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cfg::{builder::CfgBuilder, def::{CfgInstruction, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst}};
+use crate::cfg::{
+    builder::CfgBuilder,
+    def::{CfgInstruction, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst},
+};
 
 fn phi_simplification(builder: &mut CfgBuilder) -> bool {
     // remove any phi instructions that have all sources the same
@@ -17,10 +20,7 @@ fn phi_simplification(builder: &mut CfgBuilder) -> bool {
             let first_source = phi.sources.values().next().unwrap();
             let instr = CfgInstruction::Assign {
                 dest: phi.dest,
-                val: match first_source {
-                    ValueRefOrConst::Value(v) => RValue::Value(*v),
-                    ValueRefOrConst::Const(c) => RValue::Const(*c),
-                },
+                val: RValue::from_value_ref_or_const(first_source),
             };
             to_add.push((bb.id, instr));
         }
@@ -131,7 +131,7 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                             }
                         }
                     }
-                    RValue::Const(_) => {}
+                    RValue::Const(_) | RValue::ConstBool(_) => {}
                     RValue::Param { .. } => {}
                     RValue::Function { .. } => {}
                     RValue::_VarId(_) => {}
@@ -240,7 +240,7 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                                     changed = true;
                                 }
                             }
-                            RValue::Const(_) => {}
+                            RValue::Const(_) | RValue::ConstBool(_) => {}
                             RValue::Add { left, right }
                             | RValue::Sub { left, right }
                             | RValue::Mul { left, right }
@@ -310,6 +310,7 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
                             }
                         }
                         ValueRefOrConst::Const(_) => {}
+                        ValueRefOrConst::ConstBool(_) => {}
                     }
                 }
             }
@@ -361,6 +362,7 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                                     }
                                 }
                                 ValueRefOrConst::Const(c2) => c == c2,
+                                ValueRefOrConst::ConstBool(_) => false,
                             }) {
                                 if !constants.contains_key(&phi.dest) || constants[&phi.dest] != *c
                                 {
@@ -373,6 +375,7 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                     ValueRefOrConst::Const(c) => {
                         if phi.sources.values().all(|v| match v {
                             ValueRefOrConst::Const(c2) => c == c2,
+                            ValueRefOrConst::ConstBool(_) => false,
                             ValueRefOrConst::Value(v2) => match constants.get(v2) {
                                 Some(c2) => c == c2,
                                 None => false,
@@ -383,6 +386,9 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                                 changed = true;
                             }
                         }
+                    }
+                    ValueRefOrConst::ConstBool(c) => {
+                        // skip boolean constants for now
                     }
                 }
             }
@@ -395,6 +401,9 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                                 constants.insert(*dest, *c);
                                 changed = true;
                             }
+                        }
+                        RValue::ConstBool(b) => {
+                            // skip boolean constants for now
                         }
                         RValue::Add { left, right } => {
                             if let (Some(lc), Some(rc)) =

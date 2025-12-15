@@ -7,12 +7,12 @@ use crate::{
     },
     cfg::{
         def::{
-            BBId, CfgInstruction, ControlFlowGraph, RValue, TailCfgInstruction, ValueRef,
+            BBId, CfgInstruction, ControlFlowGraph, PhiType, RValue, TailCfgInstruction, ValueRef,
             ValueRefOrConst,
         },
-        sema::SemaResults,
+        sema::{SemaResults, VarType},
     },
-    parser::ast::{self, Program, TopLevel, VarId},
+    parser::ast::{self, Program, TopLevel, Type, VarId},
 };
 
 mod llvm_api;
@@ -70,6 +70,12 @@ impl Backend {
             .const_int(u64::from_be_bytes(value.to_be_bytes()), false)
     }
 
+    fn const_bool(&self, value: bool) -> VRef {
+        self.standard_ty
+            .bool_ty()
+            .const_int(if value { 1 } else { 0 }, false)
+    }
+
     pub fn lower_function(&mut self, var_id: VarId, func: &ControlFlowGraph) {
         let mut bb_map = BTreeMap::<BBId, BRef>::new();
         let mut vmap = BTreeMap::<ValueRef, VRef>::new();
@@ -88,16 +94,25 @@ impl Backend {
         for bb in &func.basic_blocks {
             let builder = self.builder.build_block(bb_map[&bb.id]);
             for instr in &bb.phi {
-                let dest_ty = instr
-                    .dest
-                    .2
-                    .and_then(|var_id| self.functions.get(&var_id))
-                    .map_or(self.standard_ty.i64_ty(), |(_, ty)| *ty);
+                let dest_ty = match instr.phi_type {
+                    PhiType::Bool => self.standard_ty.bool_ty(),
+                    PhiType::Int => self.standard_ty.i64_ty(),
+                    PhiType::Infer => instr
+                        .dest
+                        .2
+                        .map(|var_id| &self.sema.var_types[&var_id])
+                        .map_or(self.standard_ty.i64_ty(), |ty| match ty {
+                            VarType::Int => self.standard_ty.i64_ty(),
+                            VarType::Bool => self.standard_ty.bool_ty(),
+                            _ => unimplemented!("Unsupported phi type inference"),
+                        }),
+                };
                 let dest_vref = builder.phi(dest_ty, |phi| {
                     for (pred_bb_id, source_valref) in &instr.sources {
                         let source_vref = match source_valref {
                             ValueRefOrConst::Value(vr) => vmap.get(vr).cloned(),
                             ValueRefOrConst::Const(c) => Some(self.const_int(*c)),
+                            ValueRefOrConst::ConstBool(b) => Some(self.const_bool(*b)),
                         };
                         if let Some(source_vref) = source_vref {
                             phi.branch(bb_map[pred_bb_id], source_vref);
@@ -110,7 +125,7 @@ impl Backend {
                                 *pred_bb_id,
                                 match source_valref {
                                     ValueRefOrConst::Value(vr) => *vr,
-                                    ValueRefOrConst::Const(c) => {
+                                    ValueRefOrConst::Const(_) | ValueRefOrConst::ConstBool(_) => {
                                         // should not happen
                                         unreachable!("Const in deferred phi")
                                     }
@@ -127,6 +142,7 @@ impl Backend {
                     CfgInstruction::Assign { dest, val } => {
                         let rvalue = match val {
                             RValue::Const(c) => self.const_int(*c),
+                            RValue::ConstBool(b) => self.const_bool(*b),
                             RValue::Param { param_index } => {
                                 func_val.get_param(*param_index as u32)
                             }
