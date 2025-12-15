@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::cfg::{
     builder::CfgBuilder,
-    def::{CfgInstruction, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst},
+    def::{BBId, CfgInstruction, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst},
 };
 
 fn phi_simplification(builder: &mut CfgBuilder) -> bool {
@@ -186,7 +186,7 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
     changed
 }
 
-fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
+fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<ValueRef> {
     let mut live_values = BTreeSet::new();
 
     loop {
@@ -221,7 +221,7 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
             for instr in bb.instructions.iter().rev() {
                 match instr {
                     CfgInstruction::Assign { dest, val } => {
-                        if matches!(val, RValue::Call { .. }) {
+                        if matches!(val, RValue::Call { .. }) && !mark_calls {
                             // function calls are assumed to have side effects, so their dest is always live
                             if !live_values.contains(dest) {
                                 live_values.insert(*dest);
@@ -324,8 +324,8 @@ fn live_values_analysis(builder: &mut CfgBuilder) -> BTreeSet<ValueRef> {
     live_values
 }
 
-fn dead_value_elimination(builder: &mut CfgBuilder) {
-    let live_values = live_values_analysis(builder);
+fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
+    let live_values = live_values_analysis(builder, mark_calls);
 
     for bb in &mut builder.blocks {
         bb.phi.retain(|phi| live_values.contains(&phi.dest));
@@ -517,6 +517,149 @@ fn block_inliner(builder: &mut CfgBuilder) {
     }
 }
 
+fn hoist_pass(builder: &mut CfgBuilder) {
+    // attempt to hoist reused (sub-)expressions out of ifs
+    // It works similar to LLVM's GVN pass, but only for identical expressions
+    // and only hoisting out of branches
+
+    loop {
+        let mut changed = false;
+        let mut to_hoist = Vec::new();
+        for bb in &builder.blocks {
+            if let TailCfgInstruction::CondBranch {
+                cond: _,
+                then_bb,
+                else_bb,
+            } = &bb.tail
+            {
+                let then_block = &builder.blocks[then_bb.0];
+                let else_block = &builder.blocks[else_bb.0];
+
+                let mut then_exprs = BTreeMap::<RValue, ValueRef>::new();
+                let mut first_call = true;
+                for instr in &then_block.instructions {
+                    if let CfgInstruction::Assign { dest, val } = instr {
+                        if matches!(val, RValue::Call { .. }) {
+                            // we can only hoist one function call at a time to avoid function call ordering issues
+                            // e.g., if both branches call the same function *first*, we can hoist it
+                            if first_call {
+                                first_call = false;
+                            } else {
+                                continue;
+                            }
+                        }
+                        then_exprs.insert(val.clone(), *dest);
+                    }
+                }
+
+                let mut first_call = true;
+                for instr in &else_block.instructions {
+                    if let CfgInstruction::Assign { dest, val } = instr {
+                        if matches!(val, RValue::Call { .. }) {
+                            // we can only hoist one function call at a time to avoid function call ordering issues
+                            // e.g., if both branches call the same function *first*, we can hoist it
+                            if first_call {
+                                first_call = false;
+                            } else {
+                                continue;
+                            }
+                        }
+                        if let Some(then_dest) = then_exprs.get(val) {
+                            to_hoist.push((
+                                val.clone(),
+                                *then_dest,
+                                *dest,
+                                bb.id,
+                                *then_bb,
+                                *else_bb,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        for (expr, then_dest, else_dest, bb, then_bb, else_bb) in to_hoist {
+            // println!(
+            //     "Hoisting expression {:?} from BBId({}) and BBId({}) to BBId({})",
+            //     expr, then_bb.0, else_bb.0, bb.0
+            // );
+            // create a new value in the parent block
+            let new_dest = builder.allocate_value(then_dest.1, then_dest.2);
+            builder.add_instruction(
+                bb,
+                CfgInstruction::Assign {
+                    dest: new_dest,
+                    val: expr,
+                },
+            );
+
+            // replace uses in then and else blocks
+            builder.replace_value(then_dest, new_dest);
+            builder.replace_value(else_dest, new_dest);
+
+            changed = true;
+        }
+
+        if changed {
+            dead_value_elimination(builder, true);
+        }
+
+        if !changed {
+            break;
+        }
+    }
+}
+
+fn block_dedup(builder: &mut CfgBuilder) {
+    let mut block_map = BTreeMap::<BBId, Vec<BBId>>::new();
+
+    // never reuse entry block
+    for i in 1..builder.blocks.len() {
+        if block_map.contains_key(&builder.blocks[i].id) {
+            continue;
+        }
+        let bb_i = &builder.blocks[i];
+        for j in (i + 1)..builder.blocks.len() {
+            let bb_j = &builder.blocks[j];
+            if bb_i.instructions == bb_j.instructions && bb_i.tail == bb_j.tail {
+                block_map.entry(bb_i.id).or_default().push(bb_j.id);
+            }
+        }
+    }
+
+    for (from, to) in block_map.clone() {
+        for to in to {
+            for bb in &builder.blocks {
+                if bb.predecessors.contains(&from)
+                    && bb.predecessors.contains(&to)
+                    && bb.phi.len() > 0
+                {
+                    block_map.get_mut(&from).unwrap().retain(|&x| x != to);
+                }
+            }
+        }
+    }
+
+    builder.dedup_blocks(&block_map);
+}
+
+fn tail_unifyification(builder: &mut CfgBuilder) {
+    for bb in &mut builder.blocks {
+        if let TailCfgInstruction::CondBranch {
+            cond,
+            then_bb,
+            else_bb,
+        } = &bb.tail
+            && then_bb == else_bb
+        {
+            bb.tail = TailCfgInstruction::UncondBranch { target: *then_bb };
+        }
+    }
+
+    builder.link_successors_and_predecessors(&mut vec![]);
+}
+
 pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
     loop {
         let mut changed = false;
@@ -528,6 +671,14 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
     }
 
     constant_propagation(builder);
-    dead_value_elimination(builder);
+    dead_value_elimination(builder, false);
+    block_inliner(builder);
+
+    hoist_pass(builder);
+
+    block_dedup(builder);
+    tail_unifyification(builder);
+    dead_value_elimination(builder, false);
+    builder.trim_dead_blocks();
     block_inliner(builder);
 }

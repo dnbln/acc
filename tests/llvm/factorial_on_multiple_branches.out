@@ -32,27 +32,26 @@ BBId(2): % preds = [BBId(0)]
   br BBId(3)
 
 BBId(3): % preds = [BBId(1), BBId(2)]
-  %24 = Φ(2@BB1, 3@BB2) [var result]
+  %29 = Φ(2@BB1, 3@BB2) [var result]
   br BBId(4)
 
 BBId(4): % preds = [BBId(3), BBId(5)]
-  %25 = Φ(0@BB3, %17@BB5) [var i]
-  %28 = Φ(%24@BB3, %13@BB5) [var result]
-  %10 = const.i64 10
-  %11 = lt %25, %10
+  %30 = Φ(0@BB3, %17@BB5) [var i]
+  %33 = Φ(%29@BB3, %13@BB5) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
   br_cond %11 ? BBId(5) : BBId(6)
 
 BBId(5): % preds = [BBId(4)]
-  %13 = add %28, %25 [var result]
+  %13 = add %33, %30 [var result]
   %16 = const.i64 1
-  %17 = add %25, %16
+  %17 = add %30, %16
   br BBId(4)
 
 BBId(6): % preds = [BBId(4)]
-  %18 = function v1 [var factorial]
-  %20 = call %18(%28)
-  %21 = const.i64 0
-  return %21
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
 
 
 Generated LLVM IR:
@@ -91,7 +90,7 @@ bb3:                                              ; preds = %bb2, %bb1
 bb4:                                              ; preds = %bb5, %bb3
   %phi1 = phi i64 [ 0, %bb3 ], [ %add3, %bb5 ]
   %phi2 = phi i64 [ %phi, %bb3 ], [ %add, %bb5 ]
-  %cmp = icmp slt i64 %phi1, 10
+  %cmp = icmp slt i64 %phi1, 3
   br i1 %cmp, label %bb5, label %bb6
 
 bb5:                                              ; preds = %bb4
@@ -101,7 +100,7 @@ bb5:                                              ; preds = %bb4
 
 bb6:                                              ; preds = %bb4
   %call = call i64 @factorial(i64 %phi2)
-  ret i64 0
+  ret i64 %call
 }
 
 Optimized LLVM IR:
@@ -130,7 +129,7 @@ bb2:                                              ; preds = %bb0, %bb2
 ; Function Attrs: mustprogress nofree norecurse nosync nounwind willreturn memory(none)
 define noundef i64 @main() local_unnamed_addr #1 {
 factorial.exit:
-  ret i64 0
+  ret i64 120
 }
 
 attributes #0 = { nofree norecurse nosync nounwind memory(none) }

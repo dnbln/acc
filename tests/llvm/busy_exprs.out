@@ -6,19 +6,18 @@ BBId(0): % preds = []
   %4 = add %0, %1
   %7 = mul %0, %1
   %10 = lt %0, %1
+  %34 = sub %0, %1
   br_cond %10 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]
-  %13 = sub %0, %1
   br BBId(3)
 
 BBId(2): % preds = [BBId(0)]
-  %17 = sub %0, %1
   br BBId(3)
 
 BBId(3): % preds = [BBId(1), BBId(2)]
-  %30 = Φ(%13@BB1, %4@BB2) [var x]
-  %31 = Φ(%7@BB1, %17@BB2) [var y]
+  %30 = Φ(%34@BB1, %4@BB2) [var x]
+  %31 = Φ(%7@BB1, %34@BB2) [var y]
   %21 = mul %30, %31
   return %21
 
@@ -32,21 +31,20 @@ bb0:
   %add = add i64 %0, %1
   %mul = mul i64 %0, %1
   %cmp = icmp slt i64 %0, %1
+  %sub = sub i64 %0, %1
   br i1 %cmp, label %bb1, label %bb2
 
 bb1:                                              ; preds = %bb0
-  %sub = sub i64 %0, %1
   br label %bb3
 
 bb2:                                              ; preds = %bb0
-  %sub1 = sub i64 %0, %1
   br label %bb3
 
 bb3:                                              ; preds = %bb2, %bb1
   %phi = phi i64 [ %sub, %bb1 ], [ %add, %bb2 ]
-  %phi2 = phi i64 [ %mul, %bb1 ], [ %sub1, %bb2 ]
-  %mul3 = mul i64 %phi, %phi2
-  ret i64 %mul3
+  %phi1 = phi i64 [ %mul, %bb1 ], [ %sub, %bb2 ]
+  %mul2 = mul i64 %phi, %phi1
+  ret i64 %mul2
 }
 
 Optimized LLVM IR:
@@ -62,8 +60,8 @@ bb0:
   %sub = sub i64 %0, %1
   %sub.add = select i1 %cmp, i64 %sub, i64 %add
   %mul.sub = select i1 %cmp, i64 %mul, i64 %sub
-  %mul3 = mul i64 %sub.add, %mul.sub
-  ret i64 %mul3
+  %mul2 = mul i64 %sub.add, %mul.sub
+  ret i64 %mul2
 }
 
 attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }

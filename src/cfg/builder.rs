@@ -168,6 +168,8 @@ impl CfgBuilder {
             bb.predecessors.clear();
         });
 
+        let mut invalid_tails = Vec::new();
+
         let links = self
             .blocks
             .iter()
@@ -180,7 +182,7 @@ impl CfgBuilder {
                 } => vec![(bb.id, then_bb), (bb.id, else_bb)],
                 TailCfgInstruction::Return { .. } => vec![],
                 TailCfgInstruction::Undefined => {
-                    validate_errors.push(ValidateError::UndefinedTailInstruction(bb.id));
+                    invalid_tails.push(bb.id);
                     vec![]
                 }
             })
@@ -189,6 +191,12 @@ impl CfgBuilder {
         for (from, to) in links {
             self.blocks[from.0].successors.push(to);
             self.blocks[to.0].predecessors.push(from);
+        }
+
+        for bb_id in invalid_tails {
+            if !self.blocks[bb_id.0].predecessors.is_empty() {
+                validate_errors.push(ValidateError::UndefinedTailInstruction(bb_id));
+            }
         }
     }
 
@@ -415,6 +423,117 @@ impl CfgBuilder {
 
         self.relink_blocks();
         self.link_successors_and_predecessors(&mut vec![]);
+    }
+
+    pub(super) fn replace_value(&mut self, old: ValueRef, new: ValueRef) {
+        for bb in &mut self.blocks {
+            for phi in &mut bb.phi {
+                for val in phi.sources.values_mut() {
+                    if let ValueRefOrConst::Value(v) = val
+                        && *v == old
+                    {
+                        *val = ValueRefOrConst::Value(new);
+                    }
+                }
+            }
+
+            for instr in &mut bb.instructions {
+                match instr {
+                    CfgInstruction::Assign { val, .. } => match val {
+                        RValue::Value(v) => {
+                            if *v == old {
+                                *val = RValue::Value(new);
+                            }
+                        }
+                        RValue::Const(_)
+                        | RValue::ConstBool(_)
+                        | RValue::Param { .. }
+                        | RValue::Function { .. }
+                        | RValue::_VarId(..) => {}
+                        RValue::Add { left, right }
+                        | RValue::Sub { left, right }
+                        | RValue::Mul { left, right }
+                        | RValue::Div { left, right }
+                        | RValue::Modulus { left, right }
+                        | RValue::EqCheck { left, right }
+                        | RValue::NEqCheck { left, right }
+                        | RValue::LtCheck { left, right }
+                        | RValue::GtCheck { left, right }
+                        | RValue::LEqCheck { left, right }
+                        | RValue::GEqCheck { left, right }
+                        | RValue::BitwiseAnd { left, right }
+                        | RValue::BitwiseOr { left, right }
+                        | RValue::BitwiseXor { left, right }
+                        | RValue::BitShiftLeft { left, right }
+                        | RValue::BitShiftRight { left, right } => {
+                            if *left == old {
+                                *left = new;
+                            }
+                            if *right == old {
+                                *right = new;
+                            }
+                        }
+                        RValue::BitwiseNot { expr } => {
+                            if *expr == old {
+                                *expr = new;
+                            }
+                        }
+                        RValue::Call { func, args } => {
+                            if *func == old {
+                                *func = new;
+                            }
+                            for arg in args {
+                                if *arg == old {
+                                    *arg = new;
+                                }
+                            }
+                        }
+                    },
+                    _ => unreachable!(),
+                }
+            }
+
+            match &mut bb.tail {
+                TailCfgInstruction::CondBranch { cond, .. } => {
+                    if *cond == old {
+                        *cond = new;
+                    }
+                }
+                TailCfgInstruction::Return { value: Some(value) } => {
+                    if *value == old {
+                        *value = new;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub(super) fn dedup_blocks(&mut self, bb_map: &BTreeMap<BBId, Vec<BBId>>) {
+        for (bb_src, bb_dup) in bb_map {
+            for bb_dup in bb_dup {
+                for bb in &mut self.blocks {
+                    match &mut bb.tail {
+                        TailCfgInstruction::UncondBranch { target } => {
+                            if *target == *bb_dup {
+                                *target = *bb_src;
+                            }
+                        }
+                        TailCfgInstruction::CondBranch {
+                            then_bb, else_bb, ..
+                        } => {
+                            if *then_bb == *bb_dup {
+                                *then_bb = *bb_src;
+                            }
+                            if *else_bb == *bb_dup {
+                                *else_bb = *bb_src;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 }
 

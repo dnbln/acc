@@ -6,19 +6,18 @@ BBId(0): % preds = []
   %4 = add %0, %1
   %7 = mul %0, %1
   %8 = const.i64 1
+  %32 = sub %0, %1
   br_cond %8 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]
-  %11 = sub %0, %1
   br BBId(3)
 
 BBId(2): % preds = [BBId(0)]
-  %15 = sub %0, %1
   br BBId(3)
 
 BBId(3): % preds = [BBId(1), BBId(2)]
-  %28 = Φ(%11@BB1, %4@BB2) [var x]
-  %29 = Φ(%7@BB1, %15@BB2) [var y]
+  %28 = Φ(%32@BB1, %4@BB2) [var x]
+  %29 = Φ(%7@BB1, %32@BB2) [var y]
   %19 = add %28, %29
   return %19
 

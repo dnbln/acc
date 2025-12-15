@@ -472,16 +472,15 @@ BBId(0): % preds = []
   %0 = param[0] [var n]
   %2 = const.i64 1
   %3 = leq %0, %2
+  %14 = const.i64 1
   br_cond %3 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]
-  %4 = const.i64 1
-  return %4
+  return %14
 
 BBId(2): % preds = [BBId(0)]
   %6 = function v1 [var factorial]
-  %8 = const.i64 1
-  %9 = sub %0, %8
+  %9 = sub %0, %14
   %10 = call %6(%9)
   %11 = mul %0, %10
   return %11

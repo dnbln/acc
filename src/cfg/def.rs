@@ -77,7 +77,7 @@ pub enum CfgInstruction {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RValue {
     Const(i64),
     ConstBool(bool),
