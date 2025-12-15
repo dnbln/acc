@@ -210,7 +210,7 @@ fn main() -> Result<()> {
 
         for top_level in &program.items {
             match &**top_level {
-                TopLevel::Function(func, var_id) => {
+                TopLevel::Function(_, var_id) => {
                     let cfg = &program_cfgs[var_id];
                     backend.lower_function(*var_id, &cfg);
                 }

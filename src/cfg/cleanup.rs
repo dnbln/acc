@@ -620,9 +620,12 @@ fn block_dedup(builder: &mut CfgBuilder) {
             continue;
         }
         let bb_i = &builder.blocks[i];
+        if !bb_i.instructions.is_empty() || bb_i.predecessors.len() > 1 {
+            continue;
+        }
         for j in (i + 1)..builder.blocks.len() {
             let bb_j = &builder.blocks[j];
-            if bb_i.instructions == bb_j.instructions && bb_i.tail == bb_j.tail {
+            if bb_i.tail == bb_j.tail {
                 block_map.entry(bb_i.id).or_default().push(bb_j.id);
             }
         }
