@@ -518,24 +518,50 @@ fn block_inliner(builder: &mut CfgBuilder) {
 }
 
 fn compute_dominated(builder: &CfgBuilder, start_bb: BBId, dominated: &mut BTreeSet<BBId>) {
-    dominated.insert(start_bb);
+    // Compute dominated blocks using a fixed-point algorithm
+    //
+    // First find all blocks reachable from start_bb, then iteratively remove blocks that have predecessors
+    // not in the dominated set.
+    fn _compute_dominated_internal(
+        builder: &CfgBuilder,
+        start_bb: BBId,
+        dominated: &mut BTreeSet<BBId>,
+    ) {
+        dominated.insert(start_bb);
+        for succ in &builder.blocks[start_bb.0].successors {
+            if !dominated.contains(&succ) {
+                _compute_dominated_internal(builder, *succ, dominated);
+            }
+        }
+    }
 
-    for succ in &builder.blocks[start_bb.0].successors {
-        if !dominated.contains(&succ) {
-            compute_dominated(builder, *succ, dominated);
+    _compute_dominated_internal(builder, start_bb, dominated);
+
+    loop {
+        let old_dominated = dominated.clone();
+        dominated.retain(|bb| {
+            builder.blocks[start_bb.0]
+                .predecessors
+                .iter()
+                .all(|pred| old_dominated.contains(pred))
+        });
+        if dominated.len() == old_dominated.len() {
+            break;
         }
     }
 }
 
-fn compute_ascendants(builder: &CfgBuilder, ascendents: &mut BTreeSet<BBId>) -> Option<BBId> {
-    // Last inserted = most upstream block
-    let mut last_inserted = None;
-
+fn compute_ascendants(builder: &CfgBuilder, ascendents: &mut BTreeSet<BBId>) {
     loop {
         let mut to_insert = None;
         for bb in &*ascendents {
             for pred in &builder.blocks[bb.0].predecessors {
-                if !ascendents.contains(pred) {
+                if !ascendents.contains(pred)
+                    && builder.blocks[pred.0]
+                        .successors
+                        .iter()
+                        .all(|s| ascendents.contains(s))
+                {
                     to_insert = Some(*pred);
                     break;
                 }
@@ -543,13 +569,10 @@ fn compute_ascendants(builder: &CfgBuilder, ascendents: &mut BTreeSet<BBId>) -> 
         }
         if let Some(bb_id) = to_insert {
             ascendents.insert(bb_id);
-            last_inserted = Some(bb_id);
         } else {
             break;
         }
     }
-
-    last_inserted
 }
 
 fn dominated_sets(builder: &CfgBuilder) -> BTreeMap<BBId, BTreeSet<BBId>> {
@@ -581,10 +604,133 @@ fn dominated_sets(builder: &CfgBuilder) -> BTreeMap<BBId, BTreeSet<BBId>> {
 //     dominators_map
 // }
 
+fn compute_top_level(
+    builder: &CfgBuilder,
+    ascendents: &BTreeSet<BBId>,
+    init_set: &BTreeSet<BBId>,
+    top_level: &mut BTreeMap<BBId, BBId>,
+    expr_dominated: &BTreeSet<BBId>,
+) {
+    for bb in init_set {
+        let mut p = *bb;
+        loop {
+            if builder.blocks[p.0].predecessors.is_empty() {
+                break;
+            }
+
+            let parent = builder.blocks[p.0].predecessors[0];
+
+            if builder.blocks[parent.0]
+                .successors
+                .iter()
+                .any(|pr| !ascendents.contains(&pr) && !expr_dominated.contains(&pr))
+            {
+                break;
+            }
+
+            p = parent;
+        }
+
+        top_level.entry(*bb).insert_entry(p);
+    }
+}
+
 fn hoist_pass(builder: &mut CfgBuilder) {
-    // attempt to hoist reused (sub-)expressions out of ifs
-    // It works similar to LLVM's GVN pass, but only for identical expressions
-    // and only hoisting out of branches
+    // attempt to hoist reused (sub-)expressions
+    // It works similar to LLVM's GVN pass, but only for identical (sub-)expressions
+    // 
+    // The way it works is by looking for expressions (RValues) that are used in multiple places,
+    // then for each of those places, it attempts to find the "top-level" block where the expression can be computed
+    // such that all uses are dominated by that block, and there are no paths from that block that does not lead to one
+    // of the blocks where the expression isnt used. The logic for this is implemented in the compute_ascendants and
+    // compute_top_level functions above.
+    //
+    // Once the top-level blocks are found, the expression is inserted in those blocks, and the uses are replaced with
+    // the new value we just inserted in the top-level block.
+    //
+    // For example, consider the following control flow graph:
+    //
+    //              A
+    //             / \
+    //            B   C
+    //           / \   \
+    //          D   E   F
+    //          \   /   |
+    //            G     H
+    //
+    //
+    // In a graph like this, where we have the same expression used in blocks G and H, the top-level block where
+    // we can insert the expression is block A, since all paths from A lead to either G or H.
+    //
+    // However, if the graph also had a block I that was a successor of F, but it did not use the expression:
+    //
+    //              A
+    //             / \
+    //            B   C
+    //           / \   \
+    //          D   E   F
+    //          \   /   | \
+    //            G     H  I
+    //
+    // Then we could not hoist the expression to block A, since there is a path from A to I that does not lead
+    // to our expression being evaluated.
+    //
+    // Due to how we construct the SSA form CFG, we can guarantee that if an expression is used in multiple blocks,
+    // then those blocks are always dominated by a common ancestor block, which defines all the operands of the expression.
+    //
+    // So if the RValues are piece-wise equal, we can hoist them to that common ancestor block, or one of the blocks dominated by it.
+    //
+    // Let's consider another example, where the expression is used in blocks G and H:
+    //
+    //                A
+    //              /   \
+    //             B      C
+    //           /   \      \
+    //          D     E       F
+    //           \   / \        \
+    //             G    H        I
+    //
+    // In this case, the top-level block where we can hoist the expression is block B, since all paths from B lead to either G or H.
+    //
+    // We cannot hoist it to block A, since there is a path from A to I that does not lead to our expression being evaluated.
+    //
+    // This pass handles both the "very busy expressions" and the "available expressions" optimizations, since it can reuse
+    // expressions that are already computed in the parent blocks. For example, consider the same graph as above:
+    //
+    //                A
+    //              /   \
+    //             B      C
+    //           /   \      \
+    //          D     E       F
+    //           \   / \        \
+    //             G    H        I
+    //
+    // If blocks B and G both compute the same expression, then this pass will flag, via the dominance of B over G,
+    // that the expression can be reused in G, and will replace the computation in G with a use of the value computed in B.
+    //
+    // This way, we avoid redundant computations, and improve the efficiency of the generated code, which is precisely
+    // the goal of the "available expressions" optimization.
+    //
+    // This is a fixpoint algorithm, although in practice it should converge very quickly, since we are hoisiting expressions
+    // directly to where they should be computed in one iteration.
+    //
+    // An important limitation of the steps outlined above is that we only consider pure RValues, that is, expressions
+    // that do not have side effects. This means that we do not attempt to hoist function calls, since they may have side effects,
+    // and hoisting them could change the semantics of the program, if we end up calling them in a different order.
+    //
+    // As such, the current implementation handles the following Call expressions, in a CFG like this:
+    //
+    //              A
+    //             / \
+    //            B   C
+    //
+    // Where both B and C call the same function (say foo) with the same arguments. The expression can be hoisted to A,
+    // if there are no other function calls in B or C before the call to foo, which we are trying to hoist.
+    // Only then can we guarantee that hoisting the call to foo to A does not change the semantics of the program.
+    //
+    // This part is handled separately from the "top-level" hoisting algorithm outlined above, since it only works on one
+    // level of conditional branches.
+
 
     let mut doms = dominated_sets(builder);
 
@@ -595,8 +741,8 @@ fn hoist_pass(builder: &mut CfgBuilder) {
         for bb in &builder.blocks {
             for instr in &bb.instructions {
                 if let CfgInstruction::Assign { dest, val } = instr
-                    // only hoist pure RValues, calls may have side effects
-                    && !matches!(val, RValue::Call { .. })
+                    // only hoist pure RValues, calls may have side effects, and hoisitng function references is not useful
+                    && !matches!(val, RValue::Call { .. } | RValue::Function { .. })
                 {
                     exprs.entry(val.clone()).or_default().push((bb.id, *dest));
                 }
@@ -617,66 +763,136 @@ fn hoist_pass(builder: &mut CfgBuilder) {
                 asc_map.insert(*bb_id);
             }
             compute_ascendants(builder, &mut asc_map);
-            let mut candidates = asc_map
-                .iter()
-                .filter(|bb_id| {
-                    let dominated = &doms[bb_id];
-                    let mut count = 0;
-                    for (use_bb_id, _) in uses {
-                        if dominated.contains(use_bb_id) {
-                            count += 1;
-                        }
-                    }
-                    count == uses.len()
-                })
-                .copied()
-                .collect::<Vec<BBId>>();
-            if candidates.is_empty() {
-                continue;
+            let mut top_level = BTreeMap::new();
+            let mut expr_dominated = BTreeSet::<BBId>::new();
+            for bb_id in &asc_map {
+                let dominated = &doms[bb_id];
+                expr_dominated.extend(dominated);
             }
-            // pick the most downstream candidate
-            let mut best_candidate = *candidates.first().unwrap();
-            for candidate in &candidates[1..] {
-                if doms[&best_candidate].contains(candidate) {
-                    best_candidate = *candidate;
-                }
-            }
-
-            if let Some(v) = uses.iter().find(|it| it.0 == best_candidate) {
-                // already computed in the best candidate block, reuse in all other blocks
-                for (_, use_dest) in uses {
-                    if use_dest != &v.1 {
-                        builder.replace_value(*use_dest, v.1);
-                        changed = true;
-                        removed_vals.push(*use_dest);
-                    }
-                }
-                continue;
-            }
+            compute_top_level(
+                builder,
+                &asc_map,
+                &init_set,
+                &mut top_level,
+                &expr_dominated,
+            );
 
             // println!(
             //     "Hoisting expression {:?} from {:?} to {:?}",
-            //     rvalue, uses, best_candidate
+            //     rvalue,
+            //     uses.iter().map(|u| u.0).collect::<Vec<BBId>>(),
+            //     top_level.values().copied().collect::<BTreeSet<BBId>>()
             // );
 
-            // create a new value in the best_candidate block
-            let first_use = &uses[0];
-            let new_dest = builder.allocate_value(first_use.1.1, first_use.1.2);
-            builder.add_instruction(
-                best_candidate,
-                CfgInstruction::Assign {
-                    dest: new_dest,
-                    val: rvalue.clone(),
-                },
-            );
+            let mut tl_values = BTreeMap::<BBId, ValueRef>::new();
 
-            // replace uses in all use blocks
-            for (_, use_dest) in uses {
-                builder.replace_value(*use_dest, new_dest);
-                removed_vals.push(*use_dest);
+            for (bb_id, use_dest) in uses {
+                if tl_values.contains_key(&top_level[bb_id]) || top_level[bb_id] != *bb_id {
+                    continue;
+                }
+                tl_values.insert(top_level[bb_id], use_dest.clone());
             }
-            changed = true;
+
+            for (bb_id, use_dest) in uses {
+                if let Some(tl_bb) = top_level.get(bb_id) {
+                    if bb_id == tl_bb {
+                        // already computed in this block
+                        if let Some(tl_value) = tl_values.get(tl_bb)
+                            && tl_value != use_dest
+                        {
+                            // but used another value, replace
+                            builder.replace_value(*use_dest, *tl_value);
+                            changed = true;
+                            removed_vals.push(*use_dest);
+                        }
+                        continue;
+                    }
+                    if let Some(tl_value) = tl_values.get(tl_bb)
+                        && tl_value != use_dest
+                    {
+                        // already computed in the top-level block, reuse
+                        builder.replace_value(*use_dest, *tl_value);
+                        changed = true;
+                        removed_vals.push(*use_dest);
+                        continue;
+                    }
+                    let new_dest = builder.allocate_value(use_dest.1, use_dest.2);
+                    // replace use in bb_id with value from tl_bb
+                    builder.add_instruction(
+                        *tl_bb,
+                        CfgInstruction::Assign {
+                            dest: new_dest,
+                            val: rvalue.clone(),
+                        },
+                    );
+                    builder.replace_value(*use_dest, new_dest);
+                    changed = true;
+                    removed_vals.push(*use_dest);
+                    tl_values.insert(*tl_bb, new_dest);
+                }
+            }
+            //     let mut candidates = asc_map
+            //         .iter()
+            //         .filter(|bb_id| {
+            //             let dominated = &doms[bb_id];
+            //             let mut count = 0;
+            //             for (use_bb_id, _) in uses {
+            //                 if dominated.contains(use_bb_id) {
+            //                     count += 1;
+            //                 }
+            //             }
+            //             count == uses.len()
+            //         })
+            //         .copied()
+            //         .collect::<Vec<BBId>>();
+            //     if candidates.is_empty() {
+            //         continue;
+            //     }
+            //     // pick the most downstream candidate
+            //     let mut best_candidate = *candidates.first().unwrap();
+            //     for candidate in &candidates[1..] {
+            //         if doms[&best_candidate].contains(candidate) {
+            //             best_candidate = *candidate;
+            //         }
+            //     }
+
+            //     if let Some(v) = uses.iter().find(|it| it.0 == best_candidate) {
+            //         // already computed in the best candidate block, reuse in all other blocks
+            //         for (_, use_dest) in uses {
+            //             if use_dest != &v.1 {
+            //                 builder.replace_value(*use_dest, v.1);
+            //                 changed = true;
+            //                 removed_vals.push(*use_dest);
+            //             }
+            //         }
+            //         continue;
+            //     }
+
+            //     // println!(
+            //     //     "Hoisting expression {:?} from {:?} to {:?}",
+            //     //     rvalue, uses, best_candidate
+            //     // );
+
+            //     // create a new value in the best_candidate block
+            //     let first_use = &uses[0];
+            //     let new_dest = builder.allocate_value(first_use.1.1, first_use.1.2);
+            //     builder.add_instruction(
+            //         best_candidate,
+            //         CfgInstruction::Assign {
+            //             dest: new_dest,
+            //             val: rvalue.clone(),
+            //         },
+            //     );
+
+            //     // replace uses in all use blocks
+            //     for (_, use_dest) in uses {
+            //         builder.replace_value(*use_dest, new_dest);
+            //         removed_vals.push(*use_dest);
+            //     }
+            //     changed = true;
         }
+
+        // attempt to hoist out of branches (function calls)
 
         let mut to_hoist = Vec::new();
         for bb in &builder.blocks {

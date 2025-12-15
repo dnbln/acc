@@ -49,8 +49,8 @@ BBId(5): % preds = [BBId(4)]
 
 BBId(6): % preds = [BBId(4)]
   %49 = function v1 [var factorial]
-  %51 = call %49(%33)
-  return %51
+  %50 = call %49(%33)
+  return %50
 
 
 Generated LLVM IR:
