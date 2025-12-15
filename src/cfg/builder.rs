@@ -61,7 +61,9 @@ impl CfgBuilder {
         });
     }
 
-    pub(super) fn is_optimized_phi(instr: &CfgInstruction) -> Option<(ValueRef, BBId, ValueRef, VarId)> {
+    pub(super) fn is_optimized_phi(
+        instr: &CfgInstruction,
+    ) -> Option<(ValueRef, BBId, ValueRef, VarId)> {
         // An optimized phi is an assignment where the destination and source spans are the same
         // (e.g. both point to the same variable reference, e.g. the declaration, VarId).
         // Assignments (new versions of the variable) will have their destination span pointing
@@ -329,6 +331,10 @@ impl CfgBuilder {
 
         self.blocks.retain(|bb| !dead_blocks.contains(&bb.id));
 
+        self.relink_blocks();
+    }
+
+    fn relink_blocks(&mut self) {
         // Rebuild BBId mapping
         let mut bb_id_mapping = BTreeMap::new();
         for (new_index, bb) in self.blocks.iter_mut().enumerate() {
@@ -340,6 +346,19 @@ impl CfgBuilder {
 
         // Update successors and predecessors
         for bb in &mut self.blocks {
+            for phi in &mut bb.phi {
+                let new_sources = phi
+                    .sources
+                    .iter()
+                    .filter_map(|(pred_bb, val)| {
+                        bb_id_mapping
+                            .get(pred_bb)
+                            .map(|new_bb| (*new_bb, val.clone()))
+                    })
+                    .collect();
+                phi.sources = new_sources;
+            }
+
             match bb.tail {
                 TailCfgInstruction::UncondBranch { ref mut target } => {
                     if let Some(new_target) = bb_id_mapping.get(target) {
@@ -373,6 +392,29 @@ impl CfgBuilder {
                 .filter_map(|pred| bb_id_mapping.get(pred).cloned())
                 .collect();
         }
+    }
+
+    fn block_by_id_mut(&mut self, bb_id: BBId) -> &mut BasicBlock {
+        self.blocks.iter_mut().find(|bb| bb.id == bb_id).unwrap()
+    }
+
+    pub(super) fn inline_block_edge(&mut self, from_bb: BBId, to_bb: BBId) {
+        assert_ne!(from_bb, to_bb, "Cannot inline a block into itself");
+        let t = self.blocks.remove(to_bb.0);
+        let f = self.block_by_id_mut(from_bb);
+        f.instructions.extend(t.instructions);
+        f.tail = t.tail;
+
+        for succ in &t.successors {
+            for phi in &mut self.block_by_id_mut(*succ).phi {
+                if let Some(val) = phi.sources.remove(&to_bb) {
+                    phi.sources.insert(from_bb, val);
+                }
+            }
+        }
+
+        self.relink_blocks();
+        self.link_successors_and_predecessors(&mut vec![]);
     }
 }
 

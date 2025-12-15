@@ -1,17 +1,14 @@
 STDOUT:
 CFG for function main:
 BBId(0): % preds = []
-  br BBId(1)
+  %0 = const.i64 1
+  br_cond %0 ? BBId(1) : BBId(2)
 
 BBId(1): % preds = [BBId(0)]
-  %0 = const.i64 1
-  br_cond %0 ? BBId(2) : BBId(3)
-
-BBId(2): % preds = [BBId(1)]
   %1 = const.i64 0
   return %1
 
-BBId(3): % preds = [BBId(1)]
+BBId(2): % preds = [BBId(0)]
   %2 = const.i64 0
   return %2
 

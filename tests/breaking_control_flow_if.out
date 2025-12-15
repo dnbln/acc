@@ -17,28 +17,22 @@ BBId(3): % preds = [BBId(2)]
   return %3
 
 BBId(4): % preds = [BBId(2)]
-  br BBId(5)
+  %4 = const.i64 1
+  br_cond %4 ? BBId(5) : BBId(6)
 
 BBId(5): % preds = [BBId(4)]
-  %4 = const.i64 1
-  br_cond %4 ? BBId(6) : BBId(7)
+  %6 = const.i64 1
+  br_cond %6 ? BBId(7) : BBId(8)
 
-BBId(6): % preds = [BBId(5)]
-  br BBId(8)
-
-BBId(7): % preds = [BBId(5)]
+BBId(6): % preds = [BBId(4)]
   %5 = const.i64 0
   return %5
 
-BBId(8): % preds = [BBId(6)]
-  %6 = const.i64 1
-  br_cond %6 ? BBId(9) : BBId(10)
-
-BBId(9): % preds = [BBId(8)]
+BBId(7): % preds = [BBId(5)]
   %7 = const.i64 0
   return %7
 
-BBId(10): % preds = [BBId(8)]
+BBId(8): % preds = [BBId(5)]
   %8 = const.i64 0
   return %8
 

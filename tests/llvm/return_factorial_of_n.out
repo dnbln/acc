@@ -36,23 +36,20 @@ BBId(3): % preds = [BBId(1), BBId(2)]
   %23 = Φ(2@BB1, 3@BB2) [var result]
   br BBId(4)
 
-BBId(4): % preds = [BBId(3), BBId(6)]
-  %24 = Φ(0@BB3, %17@BB6) [var i]
-  %27 = Φ(%23@BB3, %13@BB6) [var result]
+BBId(4): % preds = [BBId(3), BBId(5)]
+  %24 = Φ(0@BB3, %17@BB5) [var i]
+  %27 = Φ(%23@BB3, %13@BB5) [var result]
   %10 = const.i64 3
   %11 = lt %24, %10
-  br_cond %11 ? BBId(5) : BBId(7)
+  br_cond %11 ? BBId(5) : BBId(6)
 
 BBId(5): % preds = [BBId(4)]
   %13 = add %27, %24 [var result]
-  br BBId(6)
-
-BBId(6): % preds = [BBId(5)]
   %16 = const.i64 1
   %17 = add %24, %16
   br BBId(4)
 
-BBId(7): % preds = [BBId(4)]
+BBId(6): % preds = [BBId(4)]
   %18 = function v1 [var factorial]
   %20 = call %18(%27)
   return %20
@@ -91,21 +88,18 @@ bb3:                                              ; preds = %bb2, %bb1
   %phi = phi i64 [ 2, %bb1 ], [ 3, %bb2 ]
   br label %bb4
 
-bb4:                                              ; preds = %bb6, %bb3
-  %phi1 = phi i64 [ 0, %bb3 ], [ %add3, %bb6 ]
-  %phi2 = phi i64 [ %phi, %bb3 ], [ %add, %bb6 ]
+bb4:                                              ; preds = %bb5, %bb3
+  %phi1 = phi i64 [ 0, %bb3 ], [ %add3, %bb5 ]
+  %phi2 = phi i64 [ %phi, %bb3 ], [ %add, %bb5 ]
   %cmp = icmp slt i64 %phi1, 3
-  br i1 %cmp, label %bb5, label %bb7
+  br i1 %cmp, label %bb5, label %bb6
 
 bb5:                                              ; preds = %bb4
   %add = add i64 %phi2, %phi1
-  br label %bb6
-
-bb6:                                              ; preds = %bb5
   %add3 = add i64 %phi1, 1
   br label %bb4
 
-bb7:                                              ; preds = %bb4
+bb6:                                              ; preds = %bb4
   %call = call i64 @factorial(i64 %phi2)
   ret i64 %call
 }

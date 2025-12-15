@@ -495,6 +495,28 @@ fn constant_propagation(builder: &mut CfgBuilder) {
     }
 }
 
+fn block_inliner(builder: &mut CfgBuilder) {
+    loop {
+        // inline blocks that lead directly to a block that has only one predecessor
+        let mut to_inline = None;
+        for bb in &builder.blocks {
+            if let TailCfgInstruction::UncondBranch { target } = &bb.tail {
+                let target_bb = &builder.blocks[target.0];
+                if target_bb.predecessors.len() == 1 && target_bb.predecessors[0] == bb.id {
+                    to_inline = Some((bb.id, *target));
+                    break;
+                }
+            }
+        }
+
+        if let Some((from_bb_id, to_bb_id)) = to_inline {
+            builder.inline_block_edge(from_bb_id, to_bb_id);
+        } else {
+            break;
+        }
+    }
+}
+
 pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
     loop {
         let mut changed = false;
@@ -507,4 +529,5 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
 
     constant_propagation(builder);
     dead_value_elimination(builder);
+    block_inliner(builder);
 }

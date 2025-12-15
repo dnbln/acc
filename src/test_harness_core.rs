@@ -65,9 +65,10 @@ pub fn run_test_case(
         match expect_fail {
             ExpectFailInfo::No => {
                 bail!(
-                    "Test case '{}' failed to execute.\nStderr:\n{}",
+                    "Test case '{}' failed to execute.\nStderr:\n{}\nStdout:\n{}",
                     test_name,
-                    String::from_utf8_lossy(&output.stderr)
+                    String::from_utf8_lossy(&output.stderr),
+                    String::from_utf8_lossy(&output.stdout),
                 );
             }
             ExpectFailInfo::Yes => {}

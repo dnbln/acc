@@ -3,24 +3,21 @@ CFG for function main:
 BBId(0): % preds = []
   br BBId(1)
 
-BBId(1): % preds = [BBId(0), BBId(3)]
-  %12 = Φ(0@BB0, %12@BB3) [var i]
-  %13 = Φ(0@BB0, %10@BB3) [var i]
+BBId(1): % preds = [BBId(0), BBId(2)]
+  %12 = Φ(0@BB0, %12@BB2) [var i]
+  %13 = Φ(0@BB0, %10@BB2) [var i]
   %3 = const.i64 10
   %4 = lt %13, %3
-  br_cond %4 ? BBId(2) : BBId(4)
+  br_cond %4 ? BBId(2) : BBId(3)
 
 BBId(2): % preds = [BBId(1)]
   %5 = const.i64 1
   %6 = add %13, %5 [var i]
-  br BBId(3)
-
-BBId(3): % preds = [BBId(2)]
   %9 = const.i64 1
   %10 = add %6, %9
   br BBId(1)
 
-BBId(4): % preds = [BBId(1)]
+BBId(3): % preds = [BBId(1)]
   return %12
 
 

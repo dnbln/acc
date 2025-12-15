@@ -504,23 +504,20 @@ BBId(3): % preds = [BBId(1), BBId(2)]
   %24 = Φ(2@BB1, 3@BB2) [var result]
   br BBId(4)
 
-BBId(4): % preds = [BBId(3), BBId(6)]
-  %25 = Φ(0@BB3, %17@BB6) [var i]
-  %28 = Φ(%24@BB3, %13@BB6) [var result]
+BBId(4): % preds = [BBId(3), BBId(5)]
+  %25 = Φ(0@BB3, %17@BB5) [var i]
+  %28 = Φ(%24@BB3, %13@BB5) [var result]
   %10 = const.i64 10
   %11 = lt %25, %10
-  br_cond %11 ? BBId(5) : BBId(7)
+  br_cond %11 ? BBId(5) : BBId(6)
 
 BBId(5): % preds = [BBId(4)]
   %13 = add %28, %25 [var result]
-  br BBId(6)
-
-BBId(6): % preds = [BBId(5)]
   %16 = const.i64 1
   %17 = add %25, %16
   br BBId(4)
 
-BBId(7): % preds = [BBId(4)]
+BBId(6): % preds = [BBId(4)]
   %18 = function v1 [var factorial]
   %20 = call %18(%28)
   %21 = const.i64 0
