@@ -577,6 +577,20 @@ impl Builder {
         })
     }
 
+    fn build_select(&self, cond: VRef, then_val: VRef, else_val: VRef, name: &str) -> VRef {
+        with_string(name, |name| unsafe {
+            VRef {
+                value: core::LLVMBuildSelect(
+                    self.builder,
+                    cond.value,
+                    then_val.value,
+                    else_val.value,
+                    *name,
+                ),
+            }
+        })
+    }
+
     fn build_ret(&self, value: VRef) -> VRef {
         VRef {
             value: unsafe { core::LLVMBuildRet(self.builder, value.value) },
@@ -718,6 +732,11 @@ impl<'b> BlockBuilder<'b> {
 
     pub fn call(&self, func: VRef, func_ty: Ty, args: &mut [VRef]) -> VRef {
         self.builder.build_call(func, func_ty, args, "call")
+    }
+
+    pub fn select(&self, cond: VRef, then_val: VRef, else_val: VRef) -> VRef {
+        self.builder
+            .build_select(cond, then_val, else_val, "select")
     }
 
     pub fn ret_void(&self) -> VRef {

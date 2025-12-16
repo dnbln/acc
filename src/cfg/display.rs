@@ -27,11 +27,7 @@ impl Display for ControlFlowGraph {
                 match instr {
                     CfgInstruction::Assign { dest, val: _ } => {
                         if let Some(var_id) = dest.2 {
-                            write!(
-                                f,
-                                " [var {}]",
-                                var_id
-                            )?;
+                            write!(f, " [var {}]", var_id)?;
                         }
                     }
                     CfgInstruction::_AssignVar { var_id: _, val: _ } => {
@@ -74,11 +70,7 @@ impl fmt::Display for SemaCFGPresenter<'_> {
                 write!(f, ")")?;
 
                 if let Some(var_id) = phi.var_id {
-                    write!(
-                        f,
-                        " [var {}]",
-                        self.sema.var_name(var_id)
-                    )?;
+                    write!(f, " [var {}]", self.sema.var_name(var_id))?;
                 }
 
                 writeln!(f)?;
@@ -89,11 +81,7 @@ impl fmt::Display for SemaCFGPresenter<'_> {
                 match instr {
                     CfgInstruction::Assign { dest, val: _ } => {
                         if let Some(var_id) = dest.2 {
-                            write!(
-                                f,
-                                " [var {}]",
-                                self.sema.var_name(var_id)
-                            )?;
+                            write!(f, " [var {}]", self.sema.var_name(var_id))?;
                         }
                     }
                     CfgInstruction::_AssignVar { var_id: _, val: _ } => {
@@ -249,6 +237,13 @@ impl Display for RValue {
                     write!(f, "{}", arg)?;
                 }
                 write!(f, ")")
+            }
+            RValue::Select {
+                cond,
+                then_val,
+                else_val,
+            } => {
+                write!(f, "select {}, {}, {}", cond, then_val, else_val)
             }
         }
     }

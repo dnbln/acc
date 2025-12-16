@@ -201,6 +201,21 @@ impl Backend {
                                 let func_ty = func_tys[func];
                                 builder.call(func_vref, func_ty, &mut arg_vrefs)
                             }
+                            RValue::Select {
+                                cond,
+                                then_val,
+                                else_val,
+                            } => {
+                                let c = vmap[cond];
+                                if c.ty_is_bool() {
+                                    builder.select(vmap[cond], vmap[then_val], vmap[else_val])
+                                } else {
+                                    // non-bool condition, compare against zero
+                                    let zero = self.standard_ty.i64_ty().const_int(0, false);
+                                    let cond_bool = builder.int_cmp(IntCmp::NE, c, zero);
+                                    builder.select(cond_bool, vmap[then_val], vmap[else_val])
+                                }
+                            }
                         };
                         vmap.insert(*dest, rvalue);
                     }

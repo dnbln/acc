@@ -165,6 +165,36 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                             changed = true;
                         }
                     }
+                    RValue::Select {
+                        cond,
+                        then_val,
+                        else_val,
+                    } => {
+                        let mut current_cond = *cond;
+                        while let Some(next) = equalities.get(&current_cond) {
+                            current_cond = *next;
+                        }
+                        if cond != &current_cond {
+                            *cond = current_cond;
+                            changed = true;
+                        }
+                        let mut current_then = *then_val;
+                        while let Some(next) = equalities.get(&current_then) {
+                            current_then = *next;
+                        }
+                        if then_val != &current_then {
+                            *then_val = current_then;
+                            changed = true;
+                        }
+                        let mut current_else = *else_val;
+                        while let Some(next) = equalities.get(&current_else) {
+                            current_else = *next;
+                        }
+                        if else_val != &current_else {
+                            *else_val = current_else;
+                            changed = true;
+                        }
+                    }
                 }
             }
         }
@@ -309,6 +339,24 @@ fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<
                             }
                             RValue::Param { .. } => {}
                             RValue::Function { .. } => {}
+                            RValue::Select {
+                                cond,
+                                then_val,
+                                else_val,
+                            } => {
+                                if !live_values.contains(cond) {
+                                    live_values.insert(*cond);
+                                    changed = true;
+                                }
+                                if !live_values.contains(then_val) {
+                                    live_values.insert(*then_val);
+                                    changed = true;
+                                }
+                                if !live_values.contains(else_val) {
+                                    live_values.insert(*else_val);
+                                    changed = true;
+                                }
+                            }
                         }
                     }
                     CfgInstruction::_AssignVar { .. } => {
@@ -1054,6 +1102,165 @@ fn tail_unification(builder: &mut CfgBuilder) {
     builder.link_successors_and_predecessors(&mut vec![]);
 }
 
+fn phi_to_sel(builder: &mut CfgBuilder) {
+    // The Phi to Select pass replaces phi nodes that select between two values based on a condition
+    // with a select instruction.
+    //
+    // For example, in a CFG like this:
+    //
+    //            A
+    //           / \
+    //          B   C
+    //           \ /
+    //            D
+    //
+    // If block D has a phi node like:
+    //
+    //   %x = phi(%a@B, %b@C)
+    //
+    // And block A ends with a conditional branch based on condition %cond:
+    //
+    //   br_cond %cond ? B : C
+    //
+    // With B and C having no other predecessors than A, and no instructions, we can simplify the phi node in D to a select instruction in A:
+    //
+    //   %x = select %cond, %a, %b
+    //
+    // This optimization reduces the number of phi nodes and can enable further optimizations (block_dedup, tail_unification, and block_inliner).
+
+    loop {
+        let mut changed = false;
+        let mut to_replace = Vec::new();
+
+        for bb in &builder.blocks {
+            if let TailCfgInstruction::CondBranch {
+                cond,
+                then_bb,
+                else_bb,
+            } = &bb.tail
+                && then_bb != else_bb
+                && builder.blocks[then_bb.0].predecessors.len() == 1
+                && builder.blocks[else_bb.0].predecessors.len() == 1
+                && builder.blocks[then_bb.0].predecessors[0] == bb.id
+                && builder.blocks[else_bb.0].predecessors[0] == bb.id
+                && builder.blocks[then_bb.0].instructions.is_empty()
+                && builder.blocks[else_bb.0].instructions.is_empty()
+                && builder.blocks[then_bb.0].successors.len() == 1
+                && builder.blocks[else_bb.0].successors.len() == 1
+                && let after = builder.blocks[then_bb.0].successors[0]
+                && after == builder.blocks[else_bb.0].successors[0]
+                && builder.blocks[then_bb.0].successors[0] != bb.id
+                && builder.blocks[after.0].predecessors == &[*then_bb, *else_bb]
+                && builder.blocks[after.0].phi.len() > 0
+            {
+                for phi in &builder.blocks[after.0].phi {
+                    let then_value = phi.sources.get(then_bb).unwrap();
+                    let else_value = phi.sources.get(else_bb).unwrap();
+                    to_replace.push((
+                        bb.id,
+                        after,
+                        phi.clone(),
+                        *cond,
+                        then_value.clone(),
+                        else_value.clone(),
+                    ));
+                }
+            }
+        }
+
+        let mut replaced = BTreeMap::<ValueRef, ValueRef>::new();
+
+        for (bb_id, after_bb, phi, cond, then_value, else_value) in to_replace {
+            let new_dest = builder.allocate_value(phi.dest.1, phi.dest.2);
+            let then_val = match then_value {
+                ValueRefOrConst::Value(value_ref) => {
+                    let mut target = value_ref;
+                    while let Some(repl) = replaced.get(&target) {
+                        target = *repl;
+                    }
+                    target
+                }
+                ValueRefOrConst::Const(c) => {
+                    let const_value = builder.allocate_value(phi.dest.1, phi.dest.2);
+                    builder.add_instruction(
+                        bb_id,
+                        CfgInstruction::Assign {
+                            dest: const_value,
+                            val: RValue::Const(c),
+                        },
+                    );
+                    const_value
+                }
+                ValueRefOrConst::ConstBool(c) => {
+                    let const_value = builder.allocate_value(phi.dest.1, phi.dest.2);
+                    builder.add_instruction(
+                        bb_id,
+                        CfgInstruction::Assign {
+                            dest: const_value,
+                            val: RValue::ConstBool(c),
+                        },
+                    );
+                    const_value
+                }
+            };
+            let else_val = match else_value {
+                ValueRefOrConst::Value(value_ref) => {
+                    let mut target = value_ref;
+                    while let Some(repl) = replaced.get(&target) {
+                        target = *repl;
+                    }
+                    target
+                }
+                ValueRefOrConst::Const(c) => {
+                    let const_value = builder.allocate_value(phi.dest.1, phi.dest.2);
+                    builder.add_instruction(
+                        bb_id,
+                        CfgInstruction::Assign {
+                            dest: const_value,
+                            val: RValue::Const(c),
+                        },
+                    );
+                    const_value
+                }
+                ValueRefOrConst::ConstBool(c) => {
+                    let const_value = builder.allocate_value(phi.dest.1, phi.dest.2);
+                    builder.add_instruction(
+                        bb_id,
+                        CfgInstruction::Assign {
+                            dest: const_value,
+                            val: RValue::ConstBool(c),
+                        },
+                    );
+                    const_value
+                }
+            };
+            builder.add_instruction(
+                bb_id,
+                CfgInstruction::Assign {
+                    dest: new_dest,
+                    val: RValue::Select {
+                        cond,
+                        then_val,
+                        else_val,
+                    },
+                },
+            );
+            builder.replace_value(phi.dest, new_dest);
+
+            builder.blocks[after_bb.0]
+                .phi
+                .retain(|p| p.dest != phi.dest);
+
+            replaced.insert(phi.dest, new_dest);
+            changed = true;
+        }
+
+        if !changed {
+            break;
+        }
+    }
+}
+
 pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
     loop {
         let mut changed = false;
@@ -1078,6 +1285,7 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
         }
     }
 
+    phi_to_sel(builder);
     block_dedup(builder);
     tail_unification(builder);
     dead_value_elimination(builder, true);

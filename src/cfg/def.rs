@@ -161,6 +161,11 @@ pub enum RValue {
         func: ValueRef,
         args: Vec<ValueRef>,
     },
+    Select {
+        cond: ValueRef,
+        then_val: ValueRef,
+        else_val: ValueRef,
+    },
 }
 
 impl RValue {

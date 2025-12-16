@@ -488,6 +488,21 @@ impl CfgBuilder {
                                 }
                             }
                         }
+                        RValue::Select {
+                            cond,
+                            then_val,
+                            else_val,
+                        } => {
+                            if *cond == old {
+                                *cond = new;
+                            }
+                            if *then_val == old {
+                                *then_val = new;
+                            }
+                            if *else_val == old {
+                                *else_val = new;
+                            }
+                        }
                     },
                     _ => unreachable!(),
                 }
