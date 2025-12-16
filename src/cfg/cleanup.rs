@@ -759,13 +759,27 @@ fn compute_top_level(
 }
 
 fn hoist_pass(builder: &mut CfgBuilder) {
-    // attempt to hoist reused (sub-)expressions
+    // Hoist Pass: Expression Hoisting for Available/Very Busy Analysis
+    // ================================================================
+    // Hoists reused, pure expressions to common dominators using ascendants.
+    //
+    // Algorithm:
+    // 1. Identify multi-use RValues (pure expressions).
+    // 2. Compute ascendants (blocks where expr *must* be evaluated).
+    // 3. Find "top-level" blocks: dominated by ascendants, no escaping paths.
+    // 4. Insert expr at top-level, replace uses with new value.
+    //
     // It works similar to LLVM's GVN pass, but only for identical (sub-)expressions
+    //
+    //
+    // ======================
+    // === Inner workings ===
+    // ======================
     //
     // The way it works is by looking for expressions (RValues) that are used in multiple places,
     // then for each of those places, it attempts to find the "top-level" block where the expression can be computed
-    // such that all uses are dominated by that block, and there are no paths from that block that does not lead to one
-    // of the blocks where the expression isnt used. The logic for this is implemented in the compute_ascendants and
+    // such that all uses are dominated by that block, and there are no "escaping" paths from that block (e.g. that lead
+    // to paths where the expression is not used). The logic for this is implemented in the compute_ascendants and
     // compute_top_level functions above.
     //
     // Once the top-level blocks are found, the expression is inserted in those blocks, and the uses are replaced with
@@ -795,13 +809,16 @@ fn hoist_pass(builder: &mut CfgBuilder) {
     //          \   /   | \
     //            G     H  I
     //
-    // Then we could not hoist the expression to block A, since there is a path from A to I that does not lead
+    // Then we could not hoist the expression to block A, since there is an escaping path from A to I that does not lead
     // to our expression being evaluated.
     //
     // Due to how we construct the SSA form CFG, we can guarantee that if an expression is used in multiple blocks,
-    // then those blocks are always dominated by a common ancestor block, which defines all the operands of the expression.
+    // then those blocks are always dominated by a common ancestor block, which contains the last operation required
+    // to compute the expression. This is because any value that is used in multiple blocks must have been defined in
+    // a block that dominates all those blocks.
     //
-    // So if the RValues are piece-wise equal, we can hoist them to that common ancestor block, or one of the blocks dominated by it.
+    // So if the RValues are piece-wise equal, we can hoist them to that common ancestor block, or one of the blocks
+    // dominated by it, but which is still a common ancestor to all the blocks where our expression was used.
     //
     // Let's consider another example, where the expression is used in blocks G and H:
     //
@@ -852,7 +869,7 @@ fn hoist_pass(builder: &mut CfgBuilder) {
     // Only then can we guarantee that hoisting the call to foo to A does not change the semantics of the program.
     //
     // This part is handled separately from the "top-level" hoisting algorithm outlined above, since it only works on one
-    // level of conditional branches.
+    // level of conditional branches at a time.
 
     let mut doms = dominated_sets(builder);
 
