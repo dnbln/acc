@@ -1,6 +1,9 @@
 //! Definition of the control flow graph (CFG) structures.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    hash::Hash,
+};
 
 use crate::parser::{ast::VarId, span::Span};
 
@@ -22,7 +25,7 @@ pub struct BasicBlock {
     pub(super) predecessors: Vec<BBId>,
 }
 
-#[derive(Clone, Copy, Eq, Ord, Hash, Debug)]
+#[derive(Clone, Copy, Eq, Ord, Debug)]
 pub struct ValueRef(
     pub(crate) usize,
     pub(super) Span,
@@ -39,6 +42,12 @@ impl PartialEq for ValueRef {
 impl PartialOrd for ValueRef {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.0.cmp(&other.0))
+    }
+}
+
+impl Hash for ValueRef {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }
 

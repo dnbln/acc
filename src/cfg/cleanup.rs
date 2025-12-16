@@ -622,12 +622,41 @@ fn block_inliner(builder: &mut CfgBuilder) {
     loop {
         let mut to_inline = None;
         for bb in &builder.blocks {
-            if let TailCfgInstruction::UncondBranch { target } = &bb.tail {
-                let target_bb = &builder.blocks[target.0];
-                if target_bb.predecessors.len() == 1 && target_bb.predecessors[0] == bb.id {
-                    to_inline = Some((bb.id, *target));
-                    break;
+            match &bb.tail {
+                TailCfgInstruction::UncondBranch { target } => {
+                    let target_bb = &builder.blocks[target.0];
+                    if target_bb.predecessors.len() == 1 && target_bb.predecessors[0] == bb.id {
+                        to_inline = Some((bb.id, *target));
+                        break;
+                    }
                 }
+                TailCfgInstruction::CondBranch {
+                    cond,
+                    then_bb,
+                    else_bb,
+                } => {
+                    // Inline in the following case:
+                    //
+                    //            A
+                    //           / \
+                    //          B   |
+                    //           \ /
+                    //            C
+                    let then_bb_ref = &builder.blocks[then_bb.0];
+                    let else_bb_ref = &builder.blocks[else_bb.0];
+                    if then_bb_ref.predecessors == [bb.id]
+                        && else_bb_ref.predecessors.len() == 2
+                        && else_bb_ref.predecessors.eq_unordered(&[bb.id, *then_bb])
+                        && then_bb_ref.instructions.is_empty()
+                        && (then_bb_ref.tail
+                            == TailCfgInstruction::UncondBranch { target: *else_bb })
+                        && else_bb_ref.phi.is_empty()
+                    {
+                        to_inline = Some((bb.id, *then_bb));
+                        break;
+                    }
+                }
+                _ => (),
             }
         }
 
@@ -1219,6 +1248,32 @@ fn tail_unification(builder: &mut CfgBuilder) {
     builder.link_successors_and_predecessors(&mut vec![]);
 }
 
+trait EqUnordered<T> {
+    fn eq_unordered(&self, other: &[T]) -> bool
+    where
+        T: Eq + Ord;
+}
+
+impl<T> EqUnordered<T> for Vec<T> {
+    fn eq_unordered(&self, other: &[T]) -> bool
+    where
+        T: Eq + Ord,
+    {
+        if self.len() != other.len() {
+            return false;
+        }
+        let mut self_counts = BTreeMap::<&T, usize>::new();
+        for item in self {
+            *self_counts.entry(item).or_default() += 1;
+        }
+        let mut other_counts = BTreeMap::<&T, usize>::new();
+        for item in other {
+            *other_counts.entry(item).or_default() += 1;
+        }
+        self_counts == other_counts
+    }
+}
+
 fn phi_to_sel(builder: &mut CfgBuilder) {
     // The Phi to Select pass replaces phi nodes that select between two values based on a condition
     // with a select instruction.
@@ -1244,6 +1299,14 @@ fn phi_to_sel(builder: &mut CfgBuilder) {
     //   %x = select %cond, %a, %b
     //
     // This optimization reduces the number of phi nodes and can enable further optimizations (block_dedup, tail_unification, and block_inliner).
+    //
+    // This should also handle the following CFG:
+    //
+    //            A
+    //          /   \
+    //         B     |
+    //          \   /
+    //            C
 
     loop {
         let mut changed = false;
@@ -1256,23 +1319,53 @@ fn phi_to_sel(builder: &mut CfgBuilder) {
                 else_bb,
             } = &bb.tail
                 && then_bb != else_bb
-                && builder.blocks[then_bb.0].predecessors.len() == 1
-                && builder.blocks[else_bb.0].predecessors.len() == 1
-                && builder.blocks[then_bb.0].predecessors[0] == bb.id
-                && builder.blocks[else_bb.0].predecessors[0] == bb.id
-                && builder.blocks[then_bb.0].instructions.is_empty()
-                && builder.blocks[else_bb.0].instructions.is_empty()
-                && builder.blocks[then_bb.0].successors.len() == 1
-                && builder.blocks[else_bb.0].successors.len() == 1
-                && let after = builder.blocks[then_bb.0].successors[0]
-                && after == builder.blocks[else_bb.0].successors[0]
-                && builder.blocks[then_bb.0].successors[0] != bb.id
-                && builder.blocks[after.0].predecessors == &[*then_bb, *else_bb]
-                && builder.blocks[after.0].phi.len() > 0
+                && builder[*then_bb].predecessors == [bb.id]
+                && builder[*else_bb].predecessors == [bb.id]
+                && builder[*then_bb].instructions.is_empty()
+                && builder[*else_bb].instructions.is_empty()
+                && builder[*then_bb].successors.len() == 1
+                && builder[*else_bb].successors.len() == 1
+                && let after = builder[*then_bb].successors[0]
+                && after == builder[*else_bb].successors[0]
+                && builder[*then_bb].successors[0] != bb.id
+                && builder[after]
+                    .predecessors
+                    .eq_unordered(&[*then_bb, *else_bb])
+                && builder[after].phi.len() > 0
             {
-                for phi in &builder.blocks[after.0].phi {
+                for phi in &builder[after].phi {
                     let then_value = phi.sources.get(then_bb).unwrap();
                     let else_value = phi.sources.get(else_bb).unwrap();
+                    to_replace.push((
+                        bb.id,
+                        after,
+                        phi.clone(),
+                        *cond,
+                        then_value.clone(),
+                        else_value.clone(),
+                    ));
+                }
+            } else if let TailCfgInstruction::CondBranch {
+                cond,
+                then_bb,
+                else_bb,
+            } = &bb.tail
+                && then_bb != else_bb
+                && builder[*then_bb].predecessors == [bb.id]
+                && builder[*else_bb]
+                    .predecessors
+                    .eq_unordered(&[bb.id, *then_bb])
+                && builder[*then_bb].instructions.is_empty()
+                && builder[*then_bb].successors.len() == 1
+                && let after = builder[*then_bb].successors[0]
+                && after == builder[*else_bb].id
+                && builder[*then_bb].successors[0] != bb.id
+                && builder[after].predecessors.eq_unordered(&[*then_bb, bb.id])
+                && builder[after].phi.len() > 0
+            {
+                for phi in &builder[after].phi {
+                    let then_value = phi.sources.get(then_bb).unwrap();
+                    let else_value = phi.sources.get(&bb.id).unwrap();
                     to_replace.push((
                         bb.id,
                         after,

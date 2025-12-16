@@ -7,22 +7,10 @@ BBId(0): % preds = []
   %7 = add %1, %2
   %10 = add %0, %1
   %11 = const.i64 0
-  %12 = lt %10, %11
-  br_cond %12 ? BBId(1) : BBId(2)
-
-BBId(1): % preds = [BBId(0)]
-  br BBId(2)
-
-BBId(2): % preds = [BBId(0), BBId(1)]
   %19 = gt %10, %11
-  br_cond %19 ? BBId(3) : BBId(4)
-
-BBId(3): % preds = [BBId(2)]
-  br BBId(4)
-
-BBId(4): % preds = [BBId(2), BBId(3)]
-  %44 = Φ(0@BB2, %7@BB3) [var y]
-  return %44
+  %56 = const.i64 0 [var y]
+  %55 = select %19, %7, %56 [var y]
+  return %55
 
 
 
