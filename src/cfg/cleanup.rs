@@ -540,7 +540,7 @@ fn compute_dominated(builder: &CfgBuilder, start_bb: BBId, dominated: &mut BTree
     loop {
         let old_dominated = dominated.clone();
         dominated.retain(|bb| {
-            builder.blocks[start_bb.0]
+            builder.blocks[bb.0]
                 .predecessors
                 .iter()
                 .all(|pred| old_dominated.contains(pred))
@@ -638,7 +638,7 @@ fn compute_top_level(
 fn hoist_pass(builder: &mut CfgBuilder) {
     // attempt to hoist reused (sub-)expressions
     // It works similar to LLVM's GVN pass, but only for identical (sub-)expressions
-    // 
+    //
     // The way it works is by looking for expressions (RValues) that are used in multiple places,
     // then for each of those places, it attempts to find the "top-level" block where the expression can be computed
     // such that all uses are dominated by that block, and there are no paths from that block that does not lead to one
@@ -730,7 +730,6 @@ fn hoist_pass(builder: &mut CfgBuilder) {
     //
     // This part is handled separately from the "top-level" hoisting algorithm outlined above, since it only works on one
     // level of conditional branches.
-
 
     let mut doms = dominated_sets(builder);
 
