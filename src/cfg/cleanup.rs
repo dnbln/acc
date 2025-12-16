@@ -2,22 +2,42 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::cfg::{
     builder::CfgBuilder,
-    def::{BBId, CfgInstruction, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst},
+    def::{
+        BBId, CfgInstruction, PhiCfgInstruction, RValue, TailCfgInstruction, ValueRef,
+        ValueRefOrConst,
+    },
 };
 
 fn phi_simplification(builder: &mut CfgBuilder) -> bool {
     // remove any phi instructions that have all sources the same
     let mut to_add = Vec::new();
+
+    fn compute_first_source(phi: &PhiCfgInstruction) -> Option<&ValueRefOrConst> {
+        phi.sources
+            .values()
+            .filter(|it| match it {
+                ValueRefOrConst::Const(_) | ValueRefOrConst::ConstBool(_) => true,
+                ValueRefOrConst::Value(v) => v != &phi.dest,
+            })
+            .next()
+    }
+
     for bb in &mut builder.blocks {
         let simplified_phis = bb
             .phi
             .extract_if(0..bb.phi.len(), |phi| {
-                let first_source = phi.sources.values().next().unwrap();
+                let first_source = compute_first_source(phi).unwrap();
                 phi.sources.values().all(|v| v == first_source)
+                    || phi.sources.iter().all(|it| match it.1 {
+                        ValueRefOrConst::Value(v) => {
+                            v == &phi.dest || ValueRefOrConst::Value(*v) == *first_source
+                        }
+                        _ => false,
+                    })
             })
             .collect::<Vec<_>>();
         for phi in simplified_phis {
-            let first_source = phi.sources.values().next().unwrap();
+            let first_source = compute_first_source(&phi).unwrap();
             let instr = CfgInstruction::Assign {
                 dest: phi.dest,
                 val: RValue::from_value_ref_or_const(first_source),

@@ -1,10 +1,10 @@
 STDOUT:
 CFG for function main:
 BBId(0): % preds = []
+  %0 = const.i64 0
   br BBId(1)
 
 BBId(1): % preds = [BBId(0), BBId(2)]
-  %12 = Φ(0@BB0, %12@BB2) [var i]
   %13 = Φ(0@BB0, %10@BB2) [var i]
   %3 = const.i64 10
   %4 = lt %13, %3
@@ -17,7 +17,7 @@ BBId(2): % preds = [BBId(1)]
   br BBId(1)
 
 BBId(3): % preds = [BBId(1)]
-  return %12
+  return %0
 
 
 
