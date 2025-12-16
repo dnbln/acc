@@ -540,10 +540,11 @@ fn compute_dominated(builder: &CfgBuilder, start_bb: BBId, dominated: &mut BTree
     loop {
         let old_dominated = dominated.clone();
         dominated.retain(|bb| {
-            builder.blocks[bb.0]
-                .predecessors
-                .iter()
-                .all(|pred| old_dominated.contains(pred))
+            bb == &start_bb
+                || builder.blocks[bb.0]
+                    .predecessors
+                    .iter()
+                    .all(|pred| old_dominated.contains(pred))
         });
         if dominated.len() == old_dominated.len() {
             break;
