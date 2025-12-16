@@ -206,6 +206,29 @@ fn lower_stmt_to_block(
             then_branch,
             else_branch,
         } => {
+            // We lower if statments like this:
+            //
+            //                               current_bb
+            //                                   |
+            //                                  ... (evaluate cond)
+            //                                   |
+            //                  cond_br cond_val ? then_bb : else_bb
+            //                                  /  \
+            //                                 /    \
+            //                                /      \
+            //                               /        \
+            //                           -------     -------
+            //                           then_bb     else_bb
+            //                              |           |
+            //    (then statements)        ...         ...       (else statements, if any)
+            //                               \         /
+            //                                \       /
+            //                                 \     /
+            //                                  \   /
+            //                                 -------
+            //                                 exit_bb
+            //                                    |
+            //                             (continuation)
             let mut then_bb = builder.create_bb();
             let (exit_bb, mut else_bb) = if let Some(_) = else_branch {
                 let else_bb = builder.create_bb();
@@ -262,6 +285,32 @@ fn lower_stmt_to_block(
             *bb_id = exit_bb;
         }
         Stmt::While { cond, body } => {
+            // We lower while statements like this:
+            //
+            //                               current_bb
+            //                                   |
+            //                                  ...
+            //                                   |
+            //                                br entry_bb
+            //                                   |
+            //                               ----------
+            //                                entry_bb <<------------------------------
+            //                                   |                                    |
+            //                                  ... (evaluate cond)                   |
+            //                                   |                                    |
+            //                          cond_br cond_val ? body_bb : exit_bb          |
+            //                                 /  \                                   |
+            //                                /    \                                  ^
+            //                               /      \                                 |
+            //                              /        \                                |
+            //                          -------     -------                           |
+            //                          exit_bb     body_bb                           |
+            //                             |           |                              |
+            //                      (continuation)    ... (body statements)           |
+            //                                         |                              |
+            //                                  br entry_bb -->------------------------
+
+
             let mut entry = builder.create_bb();
             let mut body_bb = builder.create_bb();
             let exit_bb = builder.create_bb();
@@ -306,6 +355,41 @@ fn lower_stmt_to_block(
             update,
             body,
         } => {
+            // We lower for statements like this:
+            //
+            //
+            //                               current_bb
+            //                                   |
+            //                                  ...
+            //                                   |
+            //                                br entry_bb
+            //                                   |
+            //                               ----------
+            //                                entry_bb <<------------------------------
+            //                                   |                                    |
+            //                                  ... (evaluate cond, if any)           |
+            //                                   |                                    |
+            //                          cond_br cond_val ? body_bb : exit_bb          |
+            //                                 /  \                                   |
+            //                                /    \                                  ^
+            //                               /      \                                 |
+            //                              /        \                                |
+            //                          -------     -------                           |
+            //                          exit_bb     body_bb                           |
+            //                             |           |                              |
+            //                      (continuation)    ... (body statements)           |
+            //                                         |                              |
+            //                                     ---------                          |
+            //                                     update_bb                          |
+            //                                         |                              |
+            //                                        ... (update expr, if any)       |
+            //                                         |                              |
+            //                                  br entry_bb -->------------------------
+            //
+            // If the condition is ommitted, we do an unconditional branch to the body_bb. The only way to get out of a
+            // for loop without a condition is via break statements, which we handle by setting the appropriate exit_bb as
+            // the break target in the ControlFlowLoopRefs we pass for the body statements.
+
             if let Some(init_stmt) = init {
                 lower_stmt_to_block(
                     builder,
@@ -751,6 +835,31 @@ fn lower_expr(
                 |left, right| RValue::GEqCheck { left, right },
             ),
             BinaryOp::And => {
+                // We do short-circuit evaluation for logical AND
+                //
+                //                               current_bb
+                //                                   |
+                //                                  ... (evaluate left)
+                //                                   |
+                //                  cond_br left_val ? right_eval_bb : exit_bb
+                //                                  /  \
+                //                                 /    \
+                //                                /      \
+                //                           -------      \
+                //                       right_eval_bb    |
+                //                             |          |
+                //           (evaluate right) ...         |
+                //                             |          |
+                //                       br exit_bb      /
+                //                               \      /
+                //                                \    /
+                //                               -------
+                //                               exit_bb
+                //                                  |
+                //            value = phi(right_eval_bb: right_val, current_bb: false)
+                //                                  |
+                //                            (continuation)
+
                 let left_val = lower_expr(builder, bb, left, sema, semantic_errors);
                 let right_eval_block_init = builder.create_bb();
                 let mut right_eval_block = right_eval_block_init;
@@ -789,6 +898,30 @@ fn lower_expr(
                 result_val
             }
             BinaryOp::Or => {
+                // We do short-circuit evaluation for logical OR
+                //
+                //                               current_bb
+                //                                   |
+                //                                  ... (evaluate left)
+                //                                   |
+                //                  cond_br left_val ? exit_bb : right_eval_bb
+                //                                  /  \
+                //                                 /    \
+                //                                /      \
+                //                           -------      \
+                //                       right_eval_bb    |
+                //                             |          |
+                //           (evaluate right) ...         |
+                //                             |          |
+                //                       br exit_bb      /
+                //                               \      /
+                //                                \    /
+                //                               -------
+                //                               exit_bb
+                //                                  |
+                //            value = phi(right_eval_bb: right_val, current_bb: true)
+                //                                  |
+                //                            (continuation)
                 let left_val = lower_expr(builder, bb, left, sema, semantic_errors);
                 let right_eval_block_init = builder.create_bb();
                 let mut right_eval_block = right_eval_block_init;
@@ -1124,6 +1257,11 @@ fn lower_expr(
 }
 
 fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
+    // Insert phi nodes for all variables everywhere there is at least a value coming in from
+    // any predecessor block.
+    //
+    // If any of the phi nodes have sources that are missing, we handle that in the separate pass
+    // malformed_phi_reduction below.
     let mut before_vars: BTreeMap<VarId, BTreeMap<BBId, ValueRef>> = BTreeMap::new();
     let mut after_vars: BTreeMap<VarId, BTreeMap<BBId, ValueRef>> = BTreeMap::new();
     let mut phis: BTreeMap<BBId, BTreeMap<VarId, BTreeMap<BBId, ValueRefOrConst>>> =
@@ -1471,6 +1609,17 @@ impl MalformedPhiInfo {
 
 fn malformed_phi_reduction(builder: &mut CfgBuilder, sema: &SemaResults) -> MalformedPhiInfo {
     // remove any phi instructions that have sources not matching the predecessors of the basic block
+    //
+    // This pass also removes any assignments that assign from values that have been removed due to
+    // malformed phis.
+    //
+    // In the end, after this pass, we should have a CFG with no malformed phis or assignments.
+    // If any of the assignments removed come from the source code, then that means that some variable
+    // is used before being initialized on all code paths, and we should report an error.
+    //
+    // We track all this information in the returned MalformedPhiInfo struct, which can be used to
+    // generate diagnostics later, as well as a graphviz representation of the malformed CFG, pointing
+    // out the missing sources for each malformed phi/assignment, as well as the missing variables on edges.
     let mut infos = Vec::new();
     let mut phi_assignments = Vec::new();
     let mut removed_vals = BTreeSet::new();

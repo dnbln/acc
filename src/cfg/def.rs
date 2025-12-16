@@ -1,6 +1,6 @@
 //! Definition of the control flow graph (CFG) structures.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::parser::{ast::VarId, span::Span};
 
@@ -75,6 +75,15 @@ pub enum CfgInstruction {
         var_id: VarId,
         val: RValue,
     },
+}
+
+impl CfgInstruction {
+    pub(super) fn is_assignment_to_live(&self, live_values: &BTreeSet<ValueRef>) -> bool {
+        match self {
+            CfgInstruction::Assign { dest, .. } => live_values.contains(dest),
+            CfgInstruction::_AssignVar { .. } => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

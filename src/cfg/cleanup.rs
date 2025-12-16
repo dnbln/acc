@@ -9,7 +9,16 @@ use crate::cfg::{
 };
 
 fn phi_simplification(builder: &mut CfgBuilder) -> bool {
-    // remove any phi instructions that have all sources the same
+    // Phi simplification pass
+    // ==========================
+    //
+    // Remove any phi instructions that have all sources the same
+    // and replace them with a simple assignment instruction.
+    // For example, if we have:
+    //   %x = phi(%a@B1, %a@B2, %a@B3)
+    // We can replace it with:
+    //   %x = %a
+    // This helps reduce unnecessary phi instructions in the CFG.
     let mut to_add = Vec::new();
 
     fn compute_first_source(phi: &PhiCfgInstruction) -> Option<&ValueRefOrConst> {
@@ -56,7 +65,14 @@ fn phi_simplification(builder: &mut CfgBuilder) -> bool {
 }
 
 fn val_inliner(builder: &mut CfgBuilder) -> bool {
-    // inline values that are assigned only once and used only once
+    // Value inlining pass
+    // ==========================
+    //
+    // If we have %a = %b, then we can replace all uses of %a with %b
+    //
+    // If we have %b = %c and %a = %b, we need to first build the equality map, then
+    // replace all uses of %a with %c. This happens by walking the equality map until we reach
+    // a value that is not mapped to another value.
     let mut equalities = BTreeMap::<ValueRef, ValueRef>::new();
     for bb in &builder.blocks {
         for instr in &bb.instructions {
@@ -237,6 +253,12 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
 }
 
 fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<ValueRef> {
+    // Live values analysis pass
+    // ==========================
+    //
+    // Compute live values using a fixed-point algorithm
+    //
+    // We start from the return values and branch conditions, marking them as live.
     let mut live_values = BTreeSet::new();
 
     loop {
@@ -393,6 +415,11 @@ fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<
 }
 
 fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
+    // Dead value elimination pass
+    // ============================
+    //
+    // Remove any instructions that assign to values that are not live.
+    // We use the live values analysis to determine which values are live.
     let live_values = live_values_analysis(builder, mark_calls);
 
     for bb in &mut builder.blocks {
@@ -410,6 +437,13 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
 }
 
 fn constant_propagation(builder: &mut CfgBuilder) {
+    // Constant propagation pass
+    // ==========================
+    //
+    // Propagate constant values through the CFG.
+    //
+    // For example, if we have %a = 5, %b = 3, and %c = %a + %b we can replace %c with 8.
+    // This enables further optimizations like dead value elimination.
     let mut constants = BTreeMap::<ValueRef, i64>::new();
 
     loop {
@@ -564,8 +598,28 @@ fn constant_propagation(builder: &mut CfgBuilder) {
 }
 
 fn block_inliner(builder: &mut CfgBuilder) {
+    // repeatedly inline blocks that lead directly to blocks with only one predecessor
+    //
+    // For example, if we have:
+    //
+    //            A
+    //            |
+    //            B
+    //            |
+    //            C
+    //
+    // We can inline B into A, resulting in:
+    //
+    //            A
+    //            |
+    //            C
+    //
+    // Then we can inline C into A as well.
+    //
+    //            A
+    //
+    // This helps reduce unnecessary jumps and simplifies the CFG.
     loop {
-        // inline blocks that lead directly to a block that has only one predecessor
         let mut to_inline = None;
         for bb in &builder.blocks {
             if let TailCfgInstruction::UncondBranch { target } = &bb.tail {
@@ -1051,6 +1105,24 @@ fn hoist_pass(builder: &mut CfgBuilder) {
 }
 
 fn block_dedup(builder: &mut CfgBuilder) {
+    // Block deduplication pass
+    // ==========================
+    //
+    // This pass identifies basic blocks that have no instructions of their own, and identical tails,
+    // and merges them to reduce redundancy in the control flow graph (CFG).
+    //
+    // For example, consider the following CFG:
+    //
+    //            A
+    //           / \
+    //          B   C
+    //           \ /
+    //            D
+    //
+    // If blocks B and C have no instructions and both lead to block D, they can be merged into a single block,
+    // reducing the number of blocks in the CFG.
+    //
+    // In the case outlined above, this pass is only valid if D has no phi nodes.
     let mut block_map = BTreeMap::<BBId, Vec<BBId>>::new();
 
     // never reuse entry block
@@ -1059,12 +1131,12 @@ fn block_dedup(builder: &mut CfgBuilder) {
             continue;
         }
         let bb_i = &builder.blocks[i];
-        if !bb_i.instructions.is_empty() || bb_i.predecessors.len() > 1 {
+        if !bb_i.phi.is_empty() || !bb_i.instructions.is_empty() || bb_i.predecessors.len() > 1 {
             continue;
         }
         for j in (i + 1)..builder.blocks.len() {
             let bb_j = &builder.blocks[j];
-            if bb_i.tail == bb_j.tail {
+            if bb_j.phi.is_empty() && bb_j.instructions.is_empty() && bb_i.tail == bb_j.tail {
                 block_map.entry(bb_i.id).or_default().push(bb_j.id);
             }
         }
@@ -1087,6 +1159,34 @@ fn block_dedup(builder: &mut CfgBuilder) {
 }
 
 fn tail_unification(builder: &mut CfgBuilder) {
+    // Tail unification pass
+    // ==========================
+    //
+    // This pass identifies conditional branches that lead to the same target block
+    // and simplifies them into unconditional branches.
+    //
+    // For example, in a CFG like this:
+    //
+    //              ---
+    //               A
+    //               |
+    //    br_cond %cond ? B : B
+    //              / \
+    //             |   |
+    //              \ /
+    //              ---
+    //               B
+    //
+    // Where block A ends with a conditional branch that leads to block B regardless of the condition,
+    // we can simplify the branch to an unconditional branch to block B:
+    //
+    //            ---
+    //             A
+    //             |
+    //            br B
+    //             |
+    //            ---
+    //             B
     for bb in &mut builder.blocks {
         if let TailCfgInstruction::CondBranch {
             cond,

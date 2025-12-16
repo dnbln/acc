@@ -565,6 +565,20 @@ impl CfgBuilder {
     }
 }
 
+impl std::ops::Index<BBId> for CfgBuilder {
+    type Output = BasicBlock;
+
+    fn index(&self, index: BBId) -> &Self::Output {
+        &self.blocks[index.0]
+    }
+}
+
+impl std::ops::IndexMut<BBId> for CfgBuilder {
+    fn index_mut(&mut self, index: BBId) -> &mut Self::Output {
+        &mut self.blocks[index.0]
+    }
+}
+
 #[derive(Debug)]
 pub enum ValidateError {
     InvalidEntryBB,
