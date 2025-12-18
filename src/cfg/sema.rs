@@ -1,5 +1,9 @@
 //! Semantic analysis.
 //! Binds variable references to their corresponding declarations.
+//! 
+//! Entry point is the [`sema`] function which takes an AST and produces
+//! a [`SemaResults`] mapping references to declarations, or a list of [`SemaError`]s
+//! if any semantic errors were found (such as undefined variables).
 
 use std::collections::BTreeMap;
 

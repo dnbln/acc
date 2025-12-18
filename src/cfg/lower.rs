@@ -1,3 +1,42 @@
+//! Lowering of AST to Control Flow Graph (CFG) structures.
+//!
+//! This file contains the main logic for lowering high-level AST constructs into a
+//! control flow graph representation suitable for further analysis and optimization.
+//!
+//! The lowering process involves translating statements and expressions into
+//! basic blocks and instructions, handling control flow constructs like
+//! if statements and loops, and inserting phi nodes where necessary.
+//!
+//! At the end of the construction, we also perform several cleanup passes to
+//! optimize the CFG.
+//!
+//! The main entry point is the `lower_ast_to_cfg` function, which takes an AST
+//! function and semantic analysis results, and produces a CFG.
+//!
+//! After the CFG is constructed, we insert phi nodes at all merge points (see [`phi_insertion`]),
+//! then we perform validation to ensure the CFG is well-formed (mainly that all PHI nodes are
+//! correctly formed, see [`malformed_phi_reduction`]).
+//!
+//! Error handling is performed throughout the lowering process, with
+//! specific error types defined for various failure modes.
+//!
+//! The resulting CFG can then be used for further analysis or code generation.
+//!
+//! For the code generation phase, we need it to follow the following invariant:
+//!
+//! No back edges should exist in the CFG except those created by loops.
+//! (The order of basic blocks in the CFG should be a topological sort of the CFG graph modulo
+//! back edges created by loops.)
+//!
+//! This is necessary to ensure that our code generation algorithm can correctly generate
+//! the LLVM IR from the CFG.
+//!
+//! This mostly means that we try to have the blocks in the same order in the CFG as they
+//! appear in the source code, except for loops which may create back edges.
+//!
+//! This is to allow our lowering to LLVM IR in O(n) time without needing to do complex
+//! analysis of the CFG structure.
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write as _,
@@ -230,24 +269,9 @@ fn lower_stmt_to_block(
             //                                    |
             //                             (continuation)
             let mut then_bb = builder.create_bb();
-            let (exit_bb, mut else_bb) = if let Some(_) = else_branch {
-                let else_bb = builder.create_bb();
-                let exit_bb = builder.create_bb();
-                (exit_bb, else_bb)
-            } else {
-                let exit_bb = builder.create_bb();
-                (exit_bb, exit_bb)
-            };
 
             let cond_val = lower_expr(builder, bb_id, cond, sema, semantic_errors);
-            builder.set_tail_instruction(
-                *bb_id,
-                TailCfgInstruction::CondBranch {
-                    cond: cond_val,
-                    then_bb,
-                    else_bb,
-                },
-            );
+
             // Lower then branch
             lower_block_to_block(
                 builder,
@@ -258,14 +282,9 @@ fn lower_stmt_to_block(
                 semantic_errors,
                 warnings,
             );
-            if !builder.bb_has_tail(then_bb) {
-                builder.set_tail_instruction(
-                    then_bb,
-                    TailCfgInstruction::UncondBranch { target: exit_bb },
-                );
-            }
             // Lower else branch
             if let Some(else_branch) = else_branch {
+                let mut else_bb = builder.create_bb();
                 lower_block_to_block(
                     builder,
                     &mut else_bb,
@@ -275,14 +294,49 @@ fn lower_stmt_to_block(
                     semantic_errors,
                     warnings,
                 );
+                let exit_bb = builder.create_bb();
                 if !builder.bb_has_tail(else_bb) {
                     builder.set_tail_instruction(
                         else_bb,
                         TailCfgInstruction::UncondBranch { target: exit_bb },
                     );
                 }
+
+                builder.set_tail_instruction(
+                    *bb_id,
+                    TailCfgInstruction::CondBranch {
+                        cond: cond_val,
+                        then_bb,
+                        else_bb,
+                    },
+                );
+
+                if !builder.bb_has_tail(then_bb) {
+                    builder.set_tail_instruction(
+                        then_bb,
+                        TailCfgInstruction::UncondBranch { target: exit_bb },
+                    );
+                }
+                *bb_id = exit_bb;
+            } else {
+                let exit_bb = builder.create_bb();
+                builder.set_tail_instruction(
+                    *bb_id,
+                    TailCfgInstruction::CondBranch {
+                        cond: cond_val,
+                        then_bb,
+                        else_bb: exit_bb,
+                    },
+                );
+
+                if !builder.bb_has_tail(then_bb) {
+                    builder.set_tail_instruction(
+                        then_bb,
+                        TailCfgInstruction::UncondBranch { target: exit_bb },
+                    );
+                }
+                *bb_id = exit_bb;
             }
-            *bb_id = exit_bb;
         }
         Stmt::While { cond, body } => {
             // We lower while statements like this:
@@ -310,15 +364,15 @@ fn lower_stmt_to_block(
             //                                         |                              |
             //                                  br entry_bb -->------------------------
 
-
             let mut entry = builder.create_bb();
             let mut body_bb = builder.create_bb();
-            let exit_bb = builder.create_bb();
 
             builder
                 .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: entry });
 
             let cond_val = lower_expr(builder, &mut entry, cond, sema, semantic_errors);
+
+            let exit_bb = builder.create_bb();
             builder.set_tail_instruction(
                 entry,
                 TailCfgInstruction::CondBranch {
@@ -1256,12 +1310,12 @@ fn lower_expr(
     }
 }
 
+/// Insert phi nodes for all variables everywhere there is at least a value coming in from
+/// any predecessor block.
+///
+/// If any of the phi nodes have sources that are missing, we handle that in the separate pass
+/// malformed_phi_reduction below.
 fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
-    // Insert phi nodes for all variables everywhere there is at least a value coming in from
-    // any predecessor block.
-    //
-    // If any of the phi nodes have sources that are missing, we handle that in the separate pass
-    // malformed_phi_reduction below.
     let mut before_vars: BTreeMap<VarId, BTreeMap<BBId, ValueRef>> = BTreeMap::new();
     let mut after_vars: BTreeMap<VarId, BTreeMap<BBId, ValueRef>> = BTreeMap::new();
     let mut phis: BTreeMap<BBId, BTreeMap<VarId, BTreeMap<BBId, ValueRefOrConst>>> =
@@ -1309,7 +1363,13 @@ fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
 
     for (block, phi) in phis {
         for (var_id, sources) in phi {
-            let (v, _) = builder.add_phi_source(block, var_id, sources, sema.var_span(var_id), PhiType::Infer);
+            let (v, _) = builder.add_phi_source(
+                block,
+                var_id,
+                sources,
+                sema.var_span(var_id),
+                PhiType::Infer,
+            );
             before_vars.entry(var_id).or_default().insert(block, v);
         }
     }
@@ -1350,7 +1410,13 @@ fn phi_insertion(builder: &mut CfgBuilder, sema: &SemaResults) {
         // propagate variables
         for (block, phi) in phis_to_add {
             for (var_id, sources) in phi {
-                let (v, ch) = builder.add_phi_source(block, var_id, sources, sema.var_span(var_id), PhiType::Infer);
+                let (v, ch) = builder.add_phi_source(
+                    block,
+                    var_id,
+                    sources,
+                    sema.var_span(var_id),
+                    PhiType::Infer,
+                );
                 before_vars.entry(var_id).or_default().insert(block, v);
                 changed |= ch;
             }
@@ -1607,19 +1673,17 @@ impl MalformedPhiInfo {
     }
 }
 
+/// This function removes any PHI instructions that have sources not matching the predecessors of the basic block
+/// they are found in, as well as any assignments that assign from values that have been removed due to malformed phis.
+///
+/// In the end, after this pass, we should have a CFG with no malformed phis or assignments.
+/// If any of the assignments removed come from the source code, then that means that some variable
+/// is used before being initialized on all code paths, and we should report an error.
+///
+/// We track all this information in the returned [`MalformedPhiInfo`] struct, which can be used to
+/// generate diagnostics later, as well as a graphviz representation of the malformed CFG, pointing
+/// out the missing sources for each malformed phi/assignment, as well as the missing variables on edges.
 fn malformed_phi_reduction(builder: &mut CfgBuilder, sema: &SemaResults) -> MalformedPhiInfo {
-    // remove any phi instructions that have sources not matching the predecessors of the basic block
-    //
-    // This pass also removes any assignments that assign from values that have been removed due to
-    // malformed phis.
-    //
-    // In the end, after this pass, we should have a CFG with no malformed phis or assignments.
-    // If any of the assignments removed come from the source code, then that means that some variable
-    // is used before being initialized on all code paths, and we should report an error.
-    //
-    // We track all this information in the returned MalformedPhiInfo struct, which can be used to
-    // generate diagnostics later, as well as a graphviz representation of the malformed CFG, pointing
-    // out the missing sources for each malformed phi/assignment, as well as the missing variables on edges.
     let mut infos = Vec::new();
     let mut phi_assignments = Vec::new();
     let mut removed_vals = BTreeSet::new();

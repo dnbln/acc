@@ -1,3 +1,10 @@
+//! This module provides functionality to display and format the Control Flow Graph (CFG)
+//! and its components in a human-readable form. It implements the `Display` trait for various
+//! CFG-related structs, allowing for easy printing and visualization of the CFG structure and
+//! its instructions. Additionally, it includes a function to generate a Graphviz representation
+//! of the CFG for graphical visualization.
+//! 
+//! See [`graphviz`] for generating a Graphviz representation of the CFG.
 use std::fmt::{self, Display, Write as _};
 
 use crate::cfg::{

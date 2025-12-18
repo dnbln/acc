@@ -7,19 +7,10 @@ BBId(0): % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %64 = sub %0, %1
-  br_cond %13 ? BBId(1) : BBId(2)
-
-BBId(1): % preds = [BBId(0)]
-  br BBId(3)
-
-BBId(2): % preds = [BBId(0)]
-  br BBId(3)
-
-BBId(3): % preds = [BBId(1), BBId(2)]
-  %44 = Φ(%64@BB1, %4@BB2) [var x]
-  %45 = Φ(%7@BB1, %64@BB2) [var y]
-  %31 = mul %44, %45
+  %49 = sub %0, %1
+  %51 = select %13, %49, %4 [var x]
+  %52 = select %13, %7, %49 [var y]
+  %31 = mul %51, %52
   %33 = add %31, %10
   return %33
 
@@ -35,18 +26,9 @@ bb0:
   %idiv = sdiv i64 %0, %1
   %cmp = icmp slt i64 %0, %1
   %sub = sub i64 %0, %1
-  br i1 %cmp, label %bb1, label %bb2
-
-bb1:                                              ; preds = %bb0
-  br label %bb3
-
-bb2:                                              ; preds = %bb0
-  br label %bb3
-
-bb3:                                              ; preds = %bb2, %bb1
-  %phi = phi i64 [ %sub, %bb1 ], [ %add, %bb2 ]
-  %phi1 = phi i64 [ %mul, %bb1 ], [ %sub, %bb2 ]
-  %mul2 = mul i64 %phi, %phi1
+  %select = select i1 %cmp, i64 %sub, i64 %add
+  %select1 = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %select, %select1
   %add3 = add i64 %mul2, %idiv
   ret i64 %add3
 }
@@ -63,9 +45,9 @@ bb0:
   %idiv = sdiv i64 %0, %1
   %cmp = icmp slt i64 %0, %1
   %sub = sub i64 %0, %1
-  %sub.add = select i1 %cmp, i64 %sub, i64 %add
-  %mul.sub = select i1 %cmp, i64 %mul, i64 %sub
-  %mul2 = mul i64 %sub.add, %mul.sub
+  %select = select i1 %cmp, i64 %sub, i64 %add
+  %select1 = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %select, %select1
   %add3 = add i64 %idiv, %mul2
   ret i64 %add3
 }

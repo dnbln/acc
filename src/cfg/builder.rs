@@ -1,3 +1,8 @@
+//! This module defines the [`CfgBuilder`] struct, which is responsible for constructing
+//! a Control Flow Graph (CFG) from a series of basic blocks and instructions.
+//! 
+//! It is used in the [`super::lower`] module to build the CFG during the lowering phase.
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write as _,

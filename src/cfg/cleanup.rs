@@ -1,3 +1,18 @@
+//! Cleanup passes for the Control Flow Graph (CFG).
+//!
+//! This module implements various optimization and cleanup passes
+//! that can be applied to the CFG after it has been constructed.
+//!
+//! The main passes implemented here include:
+//! - Phi Simplification in [`phi_simplification`]
+//! - Value Inlining in [`val_inliner`]
+//! - Dead Value Elimination in [`dead_value_elimination`]
+//! - Constant Propagation in [`constant_propagation`]
+//! - Block Inlining in [`block_inliner`]
+//! - Block Deduplication in [`block_dedup`]
+//! - Hoist Pass in [`hoist_pass`]
+//! - Phi to Select Conversion in [`phi_to_sel`]
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::cfg::{
@@ -8,17 +23,17 @@ use crate::cfg::{
     },
 };
 
+/// Phi simplification pass
+/// ==========================
+///
+/// Remove any phi instructions that have all sources the same
+/// and replace them with a simple assignment instruction.
+/// For example, if we have:
+///   %x = phi(%a@B1, %a@B2, %a@B3)
+/// We can replace it with:
+///   %x = %a
+/// This helps reduce unnecessary phi instructions in the CFG.
 fn phi_simplification(builder: &mut CfgBuilder) -> bool {
-    // Phi simplification pass
-    // ==========================
-    //
-    // Remove any phi instructions that have all sources the same
-    // and replace them with a simple assignment instruction.
-    // For example, if we have:
-    //   %x = phi(%a@B1, %a@B2, %a@B3)
-    // We can replace it with:
-    //   %x = %a
-    // This helps reduce unnecessary phi instructions in the CFG.
     let mut to_add = Vec::new();
 
     fn compute_first_source(phi: &PhiCfgInstruction) -> Option<&ValueRefOrConst> {
@@ -64,15 +79,15 @@ fn phi_simplification(builder: &mut CfgBuilder) -> bool {
     changed
 }
 
+/// Value inlining pass
+/// ==========================
+///
+/// If we have %a = %b, then we can replace all uses of %a with %b
+///
+/// If we have %b = %c and %a = %b, we need to first build the equality map, then
+/// replace all uses of %a with %c. This happens by walking the equality map until we reach
+/// a value that is not mapped to another value.
 fn val_inliner(builder: &mut CfgBuilder) -> bool {
-    // Value inlining pass
-    // ==========================
-    //
-    // If we have %a = %b, then we can replace all uses of %a with %b
-    //
-    // If we have %b = %c and %a = %b, we need to first build the equality map, then
-    // replace all uses of %a with %c. This happens by walking the equality map until we reach
-    // a value that is not mapped to another value.
     let mut equalities = BTreeMap::<ValueRef, ValueRef>::new();
     for bb in &builder.blocks {
         for instr in &bb.instructions {
@@ -177,13 +192,13 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
     changed
 }
 
+/// Live values analysis pass
+/// ==========================
+///
+/// Compute live values using a fixed-point algorithm
+///
+/// We start from the return values and branch conditions, marking them as live.
 fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<ValueRef> {
-    // Live values analysis pass
-    // ==========================
-    //
-    // Compute live values using a fixed-point algorithm
-    //
-    // We start from the return values and branch conditions, marking them as live.
     let mut live_values = BTreeSet::new();
 
     loop {
@@ -361,14 +376,14 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
     }
 }
 
+/// Constant propagation pass
+/// ==========================
+///
+/// Propagate constant values through the CFG.
+///
+/// For example, if we have %a = 5, %b = 3, and %c = %a + %b we can replace %c with 8.
+/// This enables further optimizations like dead value elimination.
 fn constant_propagation(builder: &mut CfgBuilder) {
-    // Constant propagation pass
-    // ==========================
-    //
-    // Propagate constant values through the CFG.
-    //
-    // For example, if we have %a = 5, %b = 3, and %c = %a + %b we can replace %c with 8.
-    // This enables further optimizations like dead value elimination.
     let mut constants = BTreeMap::<ValueRef, i64>::new();
 
     loop {
@@ -522,28 +537,37 @@ fn constant_propagation(builder: &mut CfgBuilder) {
     }
 }
 
+/// Block inlining pass
+/// ==========================
+///
+/// Repeatedly inline blocks that lead directly to blocks with only one predecessor
+///
+/// For example, if we have:
+///
+/// ```plaintext
+///            A
+///            |
+///            B
+///            |
+///            C
+/// ```
+///
+/// We can inline B into A, resulting in:
+///
+/// ```plaintext
+///            A
+///            |
+///            C
+/// ```
+///
+/// Then we can inline C into A as well.
+///
+/// ```plaintext
+///            A
+/// ```
+///
+/// This helps reduce unnecessary jumps and simplifies the CFG.
 fn block_inliner(builder: &mut CfgBuilder) {
-    // repeatedly inline blocks that lead directly to blocks with only one predecessor
-    //
-    // For example, if we have:
-    //
-    //            A
-    //            |
-    //            B
-    //            |
-    //            C
-    //
-    // We can inline B into A, resulting in:
-    //
-    //            A
-    //            |
-    //            C
-    //
-    // Then we can inline C into A as well.
-    //
-    //            A
-    //
-    // This helps reduce unnecessary jumps and simplifies the CFG.
     loop {
         let mut to_inline = None;
         for bb in &builder.blocks {
@@ -593,11 +617,11 @@ fn block_inliner(builder: &mut CfgBuilder) {
     }
 }
 
+/// Compute dominated blocks using a fixed-point algorithm
+///
+/// First find all blocks reachable from start_bb, then iteratively remove blocks that have predecessors
+/// not in the dominated set.
 fn compute_dominated(builder: &CfgBuilder, start_bb: BBId, dominated: &mut BTreeSet<BBId>) {
-    // Compute dominated blocks using a fixed-point algorithm
-    //
-    // First find all blocks reachable from start_bb, then iteratively remove blocks that have predecessors
-    // not in the dominated set.
     fn _compute_dominated_internal(
         builder: &CfgBuilder,
         start_bb: BBId,
@@ -712,119 +736,128 @@ fn compute_top_level(
     }
 }
 
+/// Hoist Pass: Expression Hoisting for Available/Very Busy Analysis
+/// ================================================================
+/// Hoists reused, pure expressions to common dominators using ascendants.
+///
+/// Algorithm:
+/// 1. Identify multi-use RValues (pure expressions).
+/// 2. Compute ascendants (blocks where expr *must* be evaluated).
+/// 3. Find "top-level" blocks: dominated by ascendants, no escaping paths.
+/// 4. Insert expr at top-level, replace uses with new value.
+///
+/// It works similar to LLVM's GVN pass, but only for identical (sub-)expressions
+///
+///
+/// ======================
+/// === Inner workings ===
+/// ======================
+///
+/// The way it works is by looking for expressions (RValues) that are used in multiple places,
+/// then for each of those places, it attempts to find the "top-level" block where the expression can be computed
+/// such that all uses are dominated by that block, and there are no "escaping" paths from that block (e.g. that lead
+/// to paths where the expression is not used). The logic for this is implemented in the compute_ascendants and
+/// compute_top_level functions above.
+///
+/// Once the top-level blocks are found, the expression is inserted in those blocks, and the uses are replaced with
+/// the new value we just inserted in the top-level block.
+///
+/// For example, consider the following control flow graph:
+///
+/// ```plaintext
+///              A
+///             / \
+///            B   C
+///           / \   \
+///          D   E   F
+///          \   /   |
+///            G     H
+/// ```
+///
+///
+/// In a graph like this, where we have the same expression used in blocks G and H, the top-level block where
+/// we can insert the expression is block A, since all paths from A lead to either G or H.
+///
+/// However, if the graph also had a block I that was a successor of F, but it did not use the expression:
+///
+/// ```plaintext
+///              A
+///             / \
+///            B   C
+///           / \   \
+///          D   E   F
+///          \   /   | \
+///            G     H  I
+/// ```
+///
+/// Then we could not hoist the expression to block A, since there is an escaping path from A to I that does not lead
+/// to our expression being evaluated.
+///
+/// Due to how we construct the SSA form CFG, we can guarantee that if an expression is used in multiple blocks,
+/// then those blocks are always dominated by a common ancestor block, which contains the last operation required
+/// to compute the expression. This is because any value that is used in multiple blocks must have been defined in
+/// a block that dominates all those blocks.
+///
+/// So if the RValues are piece-wise equal, we can hoist them to that common ancestor block, or one of the blocks
+/// dominated by it, but which is still a common ancestor to all the blocks where our expression was used.
+///
+/// Let's consider another example, where the expression is used in blocks G and H:
+///
+/// ```plaintext
+///                A
+///              /   \
+///             B      C
+///           /   \      \
+///          D     E       F
+///           \   / \        \
+///             G    H        I
+/// ```
+///
+/// In this case, the top-level block where we can hoist the expression is block B, since all paths from B lead to either G or H.
+///
+/// We cannot hoist it to block A, since there is a path from A to I that does not lead to our expression being evaluated.
+///
+/// This pass handles both the "very busy expressions" and the "available expressions" optimizations, since it can reuse
+/// expressions that are already computed in the parent blocks. For example, consider the same graph as above:
+///
+/// ```plaintext
+///                A
+///              /   \
+///             B      C
+///           /   \      \
+///          D     E       F
+///           \   / \        \
+///             G    H        I
+/// ```
+///
+/// If blocks B and G both compute the same expression, then this pass will flag, via the dominance of B over G,
+/// that the expression can be reused in G, and will replace the computation in G with a use of the value computed in B.
+///
+/// This way, we avoid redundant computations, and improve the efficiency of the generated code, which is precisely
+/// the goal of the "available expressions" optimization.
+///
+/// This is a fixpoint algorithm, although in practice it should converge very quickly, since we are hoisiting expressions
+/// directly to where they should be computed in one iteration.
+///
+/// An important limitation of the steps outlined above is that we only consider pure RValues, that is, expressions
+/// that do not have side effects. This means that we do not attempt to hoist function calls, since they may have side effects,
+/// and hoisting them could change the semantics of the program, if we end up calling them in a different order.
+///
+/// As such, the current implementation handles the following Call expressions, in a CFG like this:
+///
+/// ```plaintext
+///              A
+///             / \
+///            B   C
+/// ```
+///
+/// Where both B and C call the same function (say foo) with the same arguments. The expression can be hoisted to A,
+/// if there are no other function calls in B or C before the call to foo, which we are trying to hoist.
+/// Only then can we guarantee that hoisting the call to foo to A does not change the semantics of the program.
+///
+/// This part is handled separately from the "top-level" hoisting algorithm outlined above, since it only works on one
+/// level of conditional branches at a time.
 fn hoist_pass(builder: &mut CfgBuilder) {
-    // Hoist Pass: Expression Hoisting for Available/Very Busy Analysis
-    // ================================================================
-    // Hoists reused, pure expressions to common dominators using ascendants.
-    //
-    // Algorithm:
-    // 1. Identify multi-use RValues (pure expressions).
-    // 2. Compute ascendants (blocks where expr *must* be evaluated).
-    // 3. Find "top-level" blocks: dominated by ascendants, no escaping paths.
-    // 4. Insert expr at top-level, replace uses with new value.
-    //
-    // It works similar to LLVM's GVN pass, but only for identical (sub-)expressions
-    //
-    //
-    // ======================
-    // === Inner workings ===
-    // ======================
-    //
-    // The way it works is by looking for expressions (RValues) that are used in multiple places,
-    // then for each of those places, it attempts to find the "top-level" block where the expression can be computed
-    // such that all uses are dominated by that block, and there are no "escaping" paths from that block (e.g. that lead
-    // to paths where the expression is not used). The logic for this is implemented in the compute_ascendants and
-    // compute_top_level functions above.
-    //
-    // Once the top-level blocks are found, the expression is inserted in those blocks, and the uses are replaced with
-    // the new value we just inserted in the top-level block.
-    //
-    // For example, consider the following control flow graph:
-    //
-    //              A
-    //             / \
-    //            B   C
-    //           / \   \
-    //          D   E   F
-    //          \   /   |
-    //            G     H
-    //
-    //
-    // In a graph like this, where we have the same expression used in blocks G and H, the top-level block where
-    // we can insert the expression is block A, since all paths from A lead to either G or H.
-    //
-    // However, if the graph also had a block I that was a successor of F, but it did not use the expression:
-    //
-    //              A
-    //             / \
-    //            B   C
-    //           / \   \
-    //          D   E   F
-    //          \   /   | \
-    //            G     H  I
-    //
-    // Then we could not hoist the expression to block A, since there is an escaping path from A to I that does not lead
-    // to our expression being evaluated.
-    //
-    // Due to how we construct the SSA form CFG, we can guarantee that if an expression is used in multiple blocks,
-    // then those blocks are always dominated by a common ancestor block, which contains the last operation required
-    // to compute the expression. This is because any value that is used in multiple blocks must have been defined in
-    // a block that dominates all those blocks.
-    //
-    // So if the RValues are piece-wise equal, we can hoist them to that common ancestor block, or one of the blocks
-    // dominated by it, but which is still a common ancestor to all the blocks where our expression was used.
-    //
-    // Let's consider another example, where the expression is used in blocks G and H:
-    //
-    //                A
-    //              /   \
-    //             B      C
-    //           /   \      \
-    //          D     E       F
-    //           \   / \        \
-    //             G    H        I
-    //
-    // In this case, the top-level block where we can hoist the expression is block B, since all paths from B lead to either G or H.
-    //
-    // We cannot hoist it to block A, since there is a path from A to I that does not lead to our expression being evaluated.
-    //
-    // This pass handles both the "very busy expressions" and the "available expressions" optimizations, since it can reuse
-    // expressions that are already computed in the parent blocks. For example, consider the same graph as above:
-    //
-    //                A
-    //              /   \
-    //             B      C
-    //           /   \      \
-    //          D     E       F
-    //           \   / \        \
-    //             G    H        I
-    //
-    // If blocks B and G both compute the same expression, then this pass will flag, via the dominance of B over G,
-    // that the expression can be reused in G, and will replace the computation in G with a use of the value computed in B.
-    //
-    // This way, we avoid redundant computations, and improve the efficiency of the generated code, which is precisely
-    // the goal of the "available expressions" optimization.
-    //
-    // This is a fixpoint algorithm, although in practice it should converge very quickly, since we are hoisiting expressions
-    // directly to where they should be computed in one iteration.
-    //
-    // An important limitation of the steps outlined above is that we only consider pure RValues, that is, expressions
-    // that do not have side effects. This means that we do not attempt to hoist function calls, since they may have side effects,
-    // and hoisting them could change the semantics of the program, if we end up calling them in a different order.
-    //
-    // As such, the current implementation handles the following Call expressions, in a CFG like this:
-    //
-    //              A
-    //             / \
-    //            B   C
-    //
-    // Where both B and C call the same function (say foo) with the same arguments. The expression can be hoisted to A,
-    // if there are no other function calls in B or C before the call to foo, which we are trying to hoist.
-    // Only then can we guarantee that hoisting the call to foo to A does not change the semantics of the program.
-    //
-    // This part is handled separately from the "top-level" hoisting algorithm outlined above, since it only works on one
-    // level of conditional branches at a time.
-
     let mut doms = dominated_sets(builder);
 
     loop {
@@ -1075,25 +1108,27 @@ fn hoist_pass(builder: &mut CfgBuilder) {
     }
 }
 
+/// Block deduplication pass
+/// ==========================
+///
+/// This pass identifies basic blocks that have no instructions of their own, and identical tails,
+/// and merges them to reduce redundancy in the control flow graph (CFG).
+///
+/// For example, consider the following CFG:
+///
+/// ```plaintext
+///            A
+///           / \
+///          B   C
+///           \ /
+///            D
+/// ```
+///
+/// If blocks B and C have no instructions and both lead to block D, they can be merged into a single block,
+/// reducing the number of blocks in the CFG.
+///
+/// In the case outlined above, this pass is only valid if D has no phi nodes.
 fn block_dedup(builder: &mut CfgBuilder) {
-    // Block deduplication pass
-    // ==========================
-    //
-    // This pass identifies basic blocks that have no instructions of their own, and identical tails,
-    // and merges them to reduce redundancy in the control flow graph (CFG).
-    //
-    // For example, consider the following CFG:
-    //
-    //            A
-    //           / \
-    //          B   C
-    //           \ /
-    //            D
-    //
-    // If blocks B and C have no instructions and both lead to block D, they can be merged into a single block,
-    // reducing the number of blocks in the CFG.
-    //
-    // In the case outlined above, this pass is only valid if D has no phi nodes.
     let mut block_map = BTreeMap::<BBId, Vec<BBId>>::new();
 
     // never reuse entry block
@@ -1129,35 +1164,39 @@ fn block_dedup(builder: &mut CfgBuilder) {
     builder.dedup_blocks(&block_map);
 }
 
+/// Tail unification pass
+/// ==========================
+///
+/// This pass identifies conditional branches that lead to the same target block
+/// and simplifies them into unconditional branches.
+///
+/// For example, in a CFG like this:
+///
+/// ```plaintext
+///              ---
+///               A
+///               |
+///    br_cond %cond ? B : B
+///              / \
+///             |   |
+///              \ /
+///              ---
+///               B
+/// ```
+///
+/// Where block A ends with a conditional branch that leads to block B regardless of the condition,
+/// we can simplify the branch to an unconditional branch to block B:
+///
+/// ```plaintext
+///            ---
+///             A
+///             |
+///            br B
+///             |
+///            ---
+///             B
+/// ```
 fn tail_unification(builder: &mut CfgBuilder) {
-    // Tail unification pass
-    // ==========================
-    //
-    // This pass identifies conditional branches that lead to the same target block
-    // and simplifies them into unconditional branches.
-    //
-    // For example, in a CFG like this:
-    //
-    //              ---
-    //               A
-    //               |
-    //    br_cond %cond ? B : B
-    //              / \
-    //             |   |
-    //              \ /
-    //              ---
-    //               B
-    //
-    // Where block A ends with a conditional branch that leads to block B regardless of the condition,
-    // we can simplify the branch to an unconditional branch to block B:
-    //
-    //            ---
-    //             A
-    //             |
-    //            br B
-    //             |
-    //            ---
-    //             B
     for bb in &mut builder.blocks {
         if let TailCfgInstruction::CondBranch {
             cond,
@@ -1199,40 +1238,46 @@ impl<T> EqUnordered<T> for Vec<T> {
     }
 }
 
+/// Phi to Select Pass
+/// ================================
+///
+/// The Phi to Select pass replaces phi nodes that select between two values based on a condition
+/// with a select instruction.
+///
+/// For example, in a CFG like this:
+///
+/// ```plaintext
+///            A
+///           / \
+///          B   C
+///           \ /
+///            D
+/// ```
+///
+/// If block D has a phi node like:
+///
+///   %x = phi(%a@B, %b@C)
+///
+/// And block A ends with a conditional branch based on condition %cond:
+///
+///   br_cond %cond ? B : C
+///
+/// With B and C having no other predecessors than A, and no instructions, we can simplify the phi node in D to a select instruction in A:
+///
+///   %x = select %cond, %a, %b
+///
+/// This optimization reduces the number of phi nodes and can enable further optimizations (block_dedup, tail_unification, and block_inliner).
+///
+/// This should also handle the following CFG:
+///
+/// ```plaintext
+///            A
+///          /   \
+///         B     |
+///          \   /
+///            C
+/// ```
 fn phi_to_sel(builder: &mut CfgBuilder) {
-    // The Phi to Select pass replaces phi nodes that select between two values based on a condition
-    // with a select instruction.
-    //
-    // For example, in a CFG like this:
-    //
-    //            A
-    //           / \
-    //          B   C
-    //           \ /
-    //            D
-    //
-    // If block D has a phi node like:
-    //
-    //   %x = phi(%a@B, %b@C)
-    //
-    // And block A ends with a conditional branch based on condition %cond:
-    //
-    //   br_cond %cond ? B : C
-    //
-    // With B and C having no other predecessors than A, and no instructions, we can simplify the phi node in D to a select instruction in A:
-    //
-    //   %x = select %cond, %a, %b
-    //
-    // This optimization reduces the number of phi nodes and can enable further optimizations (block_dedup, tail_unification, and block_inliner).
-    //
-    // This should also handle the following CFG:
-    //
-    //            A
-    //          /   \
-    //         B     |
-    //          \   /
-    //            C
-
     loop {
         let mut changed = false;
         let mut to_replace = Vec::new();

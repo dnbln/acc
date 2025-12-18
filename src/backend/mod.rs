@@ -1,3 +1,12 @@
+//! LLVM backend module.
+//!
+//! This module provides functionality to lower the Control Flow Graph (CFG)
+//! into LLVM Intermediate Representation (IR) using the LLVM API.
+//!
+//! The main struct is [`Backend`], which manages the LLVM context, module,
+//! and builder, and provides methods to initialize functions and lower CFGs
+//! into LLVM IR.
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
