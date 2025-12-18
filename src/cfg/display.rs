@@ -180,8 +180,12 @@ impl Display for ValueRef {
 pub fn graphviz(cfg: &ControlFlowGraph) -> String {
     let mut output = String::new();
     output.push_str("digraph CFG {\n");
+    output.push_str("  node [shape=box, fontname=\"Courier New\", fontsize=10];");
+    output.push_str("  edge [fontname=\"Courier New\", fontsize=9];");
+
+    
     for bb in &cfg.basic_blocks {
-        let s = {
+        let label = {
             let mut s = String::new();
             writeln!(&mut s, "BB{}:", bb.id.0).unwrap();
             for phi in &bb.phi {
@@ -229,9 +233,37 @@ pub fn graphviz(cfg: &ControlFlowGraph) -> String {
             }
             s
         };
-        writeln!(output, "  BB{} [label={s:?}];", bb.id.0).unwrap();
-        for succ in &bb.successors {
-            writeln!(output, "  BB{} -> BB{};", bb.id.0, succ.0).unwrap();
+
+        if bb.id == cfg.entry { //make the first node (entry) in graph slightly filled
+            writeln!(
+                output,
+                "  BB{} [label=\"{}\", style=filled, fillcolor=lightblue];",
+                bb.id.0, label
+            ).unwrap();
+        } else {
+            writeln!(output, "  BB{} [label=\"{}\"];", bb.id.0, label).unwrap();
+        }
+
+        match &bb.tail {
+            TailCfgInstruction::UncondBranch { target } => {
+                writeln!(output, "  BB{} -> BB{};", bb.id.0, target.0).unwrap();
+            }
+
+            //Color true transitions green, false red
+            TailCfgInstruction::CondBranch { then_bb, else_bb, .. } => {
+                writeln!(
+                    output,
+                    "  BB{} -> BB{} [color=green];",
+                    bb.id.0, then_bb.0
+                ).unwrap();
+                writeln!(
+                    output,
+                    "  BB{} -> BB{} [color=red];",
+                    bb.id.0, else_bb.0
+                ).unwrap();
+            }
+            TailCfgInstruction::Return { .. } |
+            TailCfgInstruction::Undefined => { }
         }
     }
     output.push_str("}\n");
