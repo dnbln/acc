@@ -86,34 +86,29 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
 
     let mut changed = false;
 
+    fn process(v: &mut ValueRef, equalities: &BTreeMap<ValueRef, ValueRef>, changed: &mut bool) {
+        let mut current = *v;
+        while let Some(next) = equalities.get(&current) {
+            current = *next;
+        }
+        if v != &current {
+            *v = current;
+            *changed = true;
+        }
+    }
+
     for bb in &mut builder.blocks {
         for phi in &mut bb.phi {
             for source in phi.sources.values_mut() {
                 if let ValueRefOrConst::Value(v) = source {
-                    let mut current = *v;
-                    while let Some(next) = equalities.get(&current) {
-                        current = *next;
-                    }
-                    if v != &current {
-                        *v = current;
-                        changed = true;
-                    }
+                    process(v, &equalities, &mut changed);
                 }
             }
         }
         for instr in &mut bb.instructions {
             if let CfgInstruction::Assign { dest: _, val } = instr {
                 match val {
-                    RValue::Value(v) => {
-                        let mut current = *v;
-                        while let Some(next) = equalities.get(&current) {
-                            current = *next;
-                        }
-                        if v != &current {
-                            *v = current;
-                            changed = true;
-                        }
-                    }
+                    RValue::Value(v) => process(v, &equalities, &mut changed),
                     RValue::Add { left, right }
                     | RValue::Sub { left, right }
                     | RValue::Mul { left, right }
@@ -130,41 +125,13 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                     | RValue::BitwiseXor { left, right }
                     | RValue::BitShiftLeft { left, right }
                     | RValue::BitShiftRight { left, right } => {
-                        let mut current_left = *left;
-                        while let Some(next) = equalities.get(&current_left) {
-                            current_left = *next;
-                        }
-                        if left != &current_left {
-                            *left = current_left;
-                            changed = true;
-                        }
-                        let mut current_right = *right;
-                        while let Some(next) = equalities.get(&current_right) {
-                            current_right = *next;
-                        }
-                        if right != &current_right {
-                            *right = current_right;
-                            changed = true;
-                        }
+                        process(left, &equalities, &mut changed);
+                        process(right, &equalities, &mut changed);
                     }
                     RValue::Call { func, args } => {
-                        let mut current_func = *func;
-                        while let Some(next) = equalities.get(&current_func) {
-                            current_func = *next;
-                        }
-                        if func != &current_func {
-                            *func = current_func;
-                            changed = true;
-                        }
+                        process(func, &equalities, &mut changed);
                         for arg in args {
-                            let mut current_arg = *arg;
-                            while let Some(next) = equalities.get(&current_arg) {
-                                current_arg = *next;
-                            }
-                            if arg != &current_arg {
-                                *arg = current_arg;
-                                changed = true;
-                            }
+                            process(arg, &equalities, &mut changed);
                         }
                     }
                     RValue::Const(_) | RValue::ConstBool(_) => {}
@@ -172,44 +139,16 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                     RValue::Function { .. } => {}
                     RValue::_VarId(_) => {}
                     RValue::BitwiseNot { expr } => {
-                        let mut current_expr = *expr;
-                        while let Some(next) = equalities.get(&current_expr) {
-                            current_expr = *next;
-                        }
-                        if expr != &current_expr {
-                            *expr = current_expr;
-                            changed = true;
-                        }
+                        process(expr, &equalities, &mut changed);
                     }
                     RValue::Select {
                         cond,
                         then_val,
                         else_val,
                     } => {
-                        let mut current_cond = *cond;
-                        while let Some(next) = equalities.get(&current_cond) {
-                            current_cond = *next;
-                        }
-                        if cond != &current_cond {
-                            *cond = current_cond;
-                            changed = true;
-                        }
-                        let mut current_then = *then_val;
-                        while let Some(next) = equalities.get(&current_then) {
-                            current_then = *next;
-                        }
-                        if then_val != &current_then {
-                            *then_val = current_then;
-                            changed = true;
-                        }
-                        let mut current_else = *else_val;
-                        while let Some(next) = equalities.get(&current_else) {
-                            current_else = *next;
-                        }
-                        if else_val != &current_else {
-                            *else_val = current_else;
-                            changed = true;
-                        }
+                        process(cond, &equalities, &mut changed);
+                        process(then_val, &equalities, &mut changed);
+                        process(else_val, &equalities, &mut changed);
                     }
                 }
             }
@@ -221,26 +160,12 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
                 then_bb: _,
                 else_bb: _,
             } => {
-                let mut current = *cond;
-                while let Some(next) = equalities.get(&current) {
-                    current = *next;
-                }
-                if cond != &current {
-                    *cond = current;
-                    changed = true;
-                }
+                process(cond, &equalities, &mut changed);
             }
             TailCfgInstruction::UncondBranch { target: _ } => {}
             TailCfgInstruction::Return { value } => {
                 if let Some(v) = value {
-                    let mut current = *v;
-                    while let Some(next) = equalities.get(&current) {
-                        current = *next;
-                    }
-                    if v != &current {
-                        *v = current;
-                        changed = true;
-                    }
+                    process(v, &equalities, &mut changed);
                 }
             }
             TailCfgInstruction::Undefined => {
