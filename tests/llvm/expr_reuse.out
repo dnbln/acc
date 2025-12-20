@@ -1,4 +1,77 @@
 STDOUT:
+CFG Debug Dump before HoistPass
+BBId(0): % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %12 = lt %10, %11
+  %17 = add %0, %1
+  %18 = const.i64 0
+  %19 = gt %17, %18
+  br_cond %19 ? BBId(1) : BBId(2)
+
+
+BBId(1): % preds = [BBId(0)]
+  %22 = add %1, %2
+  br BBId(2)
+
+
+BBId(2): % preds = [BBId(0), BBId(1)]
+  %44 = Φ(0@BB0, %22@BB1) [var y]
+  return %44
+
+
+
+CFG Graphviz Dump before HoistPass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  BB0 [label="BB0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  %17 = add %0, %1\n  %18 = const.i64 0\n  %19 = gt %17, %18\n  br_cond %19 ? BB1 : BB2\n"];
+  BB0 -> BB1 [color=green];
+  BB0 -> BB2 [color=red];
+  BB1 [label="BB1:\n  %22 = add %1, %2\n  br BB2\n"];
+  BB1 -> BB2;
+  BB2 [label="BB2:\n  %44 = Φ(0@BB0, %22@BB1) [var \"y\"]\n  return %44\n"];
+}
+
+CFG Debug Dump after HoistPass
+BBId(0): % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %12 = lt %10, %11
+  %19 = gt %10, %11
+  br_cond %19 ? BBId(1) : BBId(2)
+
+
+BBId(1): % preds = [BBId(0)]
+  br BBId(2)
+
+
+BBId(2): % preds = [BBId(0), BBId(1)]
+  %44 = Φ(0@BB0, %7@BB1) [var y]
+  return %44
+
+
+
+CFG Graphviz Dump after HoistPass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  BB0 [label="BB0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  %19 = gt %10, %11\n  br_cond %19 ? BB1 : BB2\n"];
+  BB0 -> BB1 [color=green];
+  BB0 -> BB2 [color=red];
+  BB1 [label="BB1:\n  br BB2\n"];
+  BB1 -> BB2;
+  BB2 [label="BB2:\n  %44 = Φ(0@BB0, %7@BB1) [var \"y\"]\n  return %44\n"];
+}
+
 CFG for function foo:
 BBId(0): % preds = []
   %0 = param[0] [var a]

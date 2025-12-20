@@ -21,6 +21,7 @@ use crate::cfg::{
         BBId, CfgInstruction, PhiCfgInstruction, RValue, TailCfgInstruction, ValueRef,
         ValueRefOrConst,
     },
+    sema::SemaResults,
 };
 
 /// Phi simplification pass
@@ -1454,6 +1455,8 @@ pub enum OptPass {
     BlockDedup,
     TailUnification,
     TrimDeadBlocks,
+    Debug { name: &'static str },
+    DebugGraphviz { name: &'static str },
 }
 
 #[derive(Debug, Clone)]
@@ -1494,7 +1497,7 @@ impl OptPassConfig {
     }
 }
 
-pub(super) fn cleanup_passes(builder: &mut CfgBuilder, config: &OptPassConfig) {
+pub(super) fn cleanup_passes(builder: &mut CfgBuilder, sema: &SemaResults, config: &OptPassConfig) {
     for pass in &config.passes {
         match pass {
             OptPass::ConstantPropagation => constant_propagation(builder),
@@ -1519,6 +1522,14 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder, config: &OptPassConfig) {
             OptPass::BlockDedup => block_dedup(builder),
             OptPass::TailUnification => tail_unification(builder),
             OptPass::TrimDeadBlocks => builder.trim_dead_blocks(),
+            OptPass::Debug { name } => {
+                println!("CFG Debug Dump {name}");
+                builder.debug(sema);
+            }
+            OptPass::DebugGraphviz { name } => {
+                println!("CFG Graphviz Dump {name}");
+                println!("{}", builder.debug_graphviz(sema));
+            }
         }
     }
 }

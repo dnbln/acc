@@ -3,13 +3,14 @@
 //! CFG-related structs, allowing for easy printing and visualization of the CFG structure and
 //! its instructions. Additionally, it includes a function to generate a Graphviz representation
 //! of the CFG for graphical visualization.
-//! 
+//!
 //! See [`graphviz`] for generating a Graphviz representation of the CFG.
 use std::fmt::{self, Display, Write as _};
 
 use crate::cfg::{
     def::{
-        CfgInstruction, ControlFlowGraph, RValue, TailCfgInstruction, ValueRef, ValueRefOrConst,
+        BasicBlock, CfgInstruction, ControlFlowGraph, RValue, TailCfgInstruction, ValueRef,
+        ValueRefOrConst,
     },
     sema::SemaResults,
 };
@@ -57,6 +58,59 @@ impl ControlFlowGraph {
     }
 }
 
+pub struct SemaBlockPresenter<'a> {
+    bb: &'a BasicBlock,
+    sema: &'a SemaResults,
+}
+
+impl BasicBlock {
+    pub fn display_with_sema<'a>(&'a self, sema: &'a SemaResults) -> SemaBlockPresenter<'a> {
+        SemaBlockPresenter { bb: self, sema }
+    }
+}
+
+impl fmt::Display for SemaBlockPresenter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let bb = self.bb;
+        writeln!(f, "{:?}: % preds = {:?}", bb.id, bb.predecessors)?;
+        for phi in &bb.phi {
+            write!(f, "  {} = Φ(", phi.dest)?;
+            for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{val}@BB{}", pred_bb.0)?;
+            }
+            write!(f, ")")?;
+
+            if let Some(var_id) = phi.var_id {
+                write!(f, " [var {}]", self.sema.var_name(var_id))?;
+            }
+
+            writeln!(f)?;
+        }
+        for instr in &bb.instructions {
+            write!(f, "  {}", instr)?;
+
+            match instr {
+                CfgInstruction::Assign { dest, val: _ } => {
+                    if let Some(var_id) = dest.2 {
+                        write!(f, " [var {}]", self.sema.var_name(var_id))?;
+                    }
+                }
+                CfgInstruction::_AssignVar { var_id: _, val: _ } => {
+                    unreachable!()
+                }
+            }
+
+            writeln!(f)?;
+        }
+        writeln!(f, "  {}", bb.tail)?;
+        writeln!(f)?;
+        Ok(())
+    }
+}
+
 pub struct SemaCFGPresenter<'a> {
     cfg: &'a ControlFlowGraph,
     sema: &'a SemaResults,
@@ -65,41 +119,11 @@ pub struct SemaCFGPresenter<'a> {
 impl fmt::Display for SemaCFGPresenter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for bb in &self.cfg.basic_blocks {
-            writeln!(f, "{:?}: % preds = {:?}", bb.id, bb.predecessors)?;
-            for phi in &bb.phi {
-                write!(f, "  {} = Φ(", phi.dest)?;
-                for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{val}@BB{}", pred_bb.0)?;
-                }
-                write!(f, ")")?;
-
-                if let Some(var_id) = phi.var_id {
-                    write!(f, " [var {}]", self.sema.var_name(var_id))?;
-                }
-
-                writeln!(f)?;
-            }
-            for instr in &bb.instructions {
-                write!(f, "  {}", instr)?;
-
-                match instr {
-                    CfgInstruction::Assign { dest, val: _ } => {
-                        if let Some(var_id) = dest.2 {
-                            write!(f, " [var {}]", self.sema.var_name(var_id))?;
-                        }
-                    }
-                    CfgInstruction::_AssignVar { var_id: _, val: _ } => {
-                        unreachable!()
-                    }
-                }
-
-                writeln!(f)?;
-            }
-            writeln!(f, "  {}", bb.tail)?;
-            writeln!(f)?;
+            let presenter = SemaBlockPresenter {
+                bb,
+                sema: self.sema,
+            };
+            write!(f, "{}", presenter)?;
         }
         Ok(())
     }
@@ -267,111 +291,112 @@ impl Display for ValueRef {
     }
 }
 
+pub(super) fn debug_graphviz(output: &mut String, bb: &BasicBlock, sema: &SemaResults) {
+    let label = {
+        let mut s = String::new();
+        writeln!(&mut s, "BB{}:", bb.id.0).unwrap();
+        for phi in &bb.phi {
+            write!(&mut s, "  {} = Φ(", phi.dest).unwrap();
+            for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
+                if i > 0 {
+                    write!(&mut s, ", ").unwrap();
+                }
+                write!(&mut s, "{val}@BB{}", pred_bb.0).unwrap();
+            }
+            write!(&mut s, ")").unwrap();
+
+            if let Some(var_id) = phi.var_id {
+                write!(&mut s, " [var {:?}]", sema.var_name(var_id)).unwrap();
+            }
+
+            writeln!(&mut s).unwrap();
+        }
+        for instr in &bb.instructions {
+            write!(&mut s, "  {}", instr).unwrap();
+
+            match instr {
+                CfgInstruction::Assign { dest, val: _ } => {
+                    if let Some(var_id) = dest.2 {
+                        write!(&mut s, " [var {}]", sema.var_name(var_id)).unwrap();
+                    }
+                }
+                CfgInstruction::_AssignVar { var_id: _, val: _ } => {
+                    unreachable!()
+                }
+            }
+
+            writeln!(&mut s).unwrap();
+        }
+        match &bb.tail {
+            TailCfgInstruction::Undefined => {
+                s.push_str("undefined\n");
+            }
+            TailCfgInstruction::UncondBranch { target } => {
+                writeln!(&mut s, "  br BB{}", target.0).unwrap();
+            }
+            TailCfgInstruction::CondBranch {
+                cond,
+                then_bb,
+                else_bb,
+            } => {
+                writeln!(
+                    &mut s,
+                    "  br_cond {} ? BB{} : BB{}",
+                    cond, then_bb.0, else_bb.0
+                )
+                .unwrap();
+            }
+            TailCfgInstruction::Return { value } => match value {
+                Some(v) => {
+                    writeln!(&mut s, "  return {}", v).unwrap();
+                }
+                None => {
+                    writeln!(&mut s, "  return").unwrap();
+                }
+            },
+        }
+        s
+    };
+
+    // if bb.id == cfg.entry {
+    //     //make the first node (entry) in graph slightly filled
+    //     writeln!(
+    //         output,
+    //         "  BB{} [label={:?}, style=filled, fillcolor=lightblue];",
+    //         bb.id.0, label
+    //     )
+    //     .unwrap();
+    // } else {
+    writeln!(output, "  BB{} [label={:?}];", bb.id.0, label).unwrap();
+    // }
+
+    match &bb.tail {
+        TailCfgInstruction::UncondBranch { target } => {
+            writeln!(output, "  BB{} -> BB{};", bb.id.0, target.0).unwrap();
+        }
+
+        //Color true transitions green, false red
+        TailCfgInstruction::CondBranch {
+            then_bb, else_bb, ..
+        } => {
+            writeln!(output, "  BB{} -> BB{} [color=green];", bb.id.0, then_bb.0).unwrap();
+            writeln!(output, "  BB{} -> BB{} [color=red];", bb.id.0, else_bb.0).unwrap();
+        }
+        TailCfgInstruction::Return { .. } | TailCfgInstruction::Undefined => {}
+    }
+}
+
+pub(super) const GRAPHVIZ_HEADER: &str = r#"  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+"#;
+
 pub fn graphviz(cfg: &ControlFlowGraph, sema: &SemaResults) -> String {
     let mut output = String::new();
     output.push_str("digraph CFG {\n");
-    output.push_str("  node [shape=box, fontname=\"Courier New\", fontsize=10];");
-    output.push_str("  edge [fontname=\"Courier New\", fontsize=9];");
+    output.push_str(GRAPHVIZ_HEADER);
 
-    
     for bb in &cfg.basic_blocks {
-        let label = {
-            let mut s = String::new();
-            writeln!(&mut s, "BB{}:", bb.id.0).unwrap();
-            for phi in &bb.phi {
-                write!(&mut s, "  {} = Φ(", phi.dest).unwrap();
-                for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
-                    if i > 0 {
-                        write!(&mut s, ", ").unwrap();
-                    }
-                    write!(&mut s, "{val}@BB{}", pred_bb.0).unwrap();
-                }
-                write!(&mut s, ")").unwrap();
-
-                if let Some(var_id) = phi.var_id {
-                    write!(&mut s, " [var {:?}]", sema.var_name(var_id)).unwrap();
-                }
-
-                writeln!(&mut s).unwrap();
-            }
-            for instr in &bb.instructions {
-                write!(&mut s, "  {}", instr).unwrap();
-
-                match instr {
-                    CfgInstruction::Assign { dest, val: _ } => {
-                        if let Some(var_id) = dest.2 {
-                            write!(&mut s, " [var {}]", sema.var_name(var_id)).unwrap();
-                        }
-                    }
-                    CfgInstruction::_AssignVar { var_id: _, val: _ } => {
-                        unreachable!()
-                    }
-                }
-
-                writeln!(&mut s).unwrap();
-            }
-            match &bb.tail {
-                TailCfgInstruction::Undefined => {
-                    s.push_str("undefined\n");
-                }
-                TailCfgInstruction::UncondBranch { target } => {
-                    writeln!(&mut s, "  br BB{}", target.0).unwrap();
-                }
-                TailCfgInstruction::CondBranch {
-                    cond,
-                    then_bb,
-                    else_bb,
-                } => {
-                    writeln!(
-                        &mut s,
-                        "  br_cond {} ? BB{} : BB{}",
-                        cond, then_bb.0, else_bb.0
-                    )
-                    .unwrap();
-                }
-                TailCfgInstruction::Return { value } => match value {
-                    Some(v) => {
-                        writeln!(&mut s, "  return {}", v).unwrap();
-                    }
-                    None => {
-                        writeln!(&mut s, "  return").unwrap();
-                    }
-                },
-            }
-            s
-        };
-
-        if bb.id == cfg.entry { //make the first node (entry) in graph slightly filled
-            writeln!(
-                output,
-                "  BB{} [label={:?}, style=filled, fillcolor=lightblue];",
-                bb.id.0, label
-            ).unwrap();
-        } else {
-            writeln!(output, "  BB{} [label={:?}];", bb.id.0, label).unwrap();
-        }
-
-        match &bb.tail {
-            TailCfgInstruction::UncondBranch { target } => {
-                writeln!(output, "  BB{} -> BB{};", bb.id.0, target.0).unwrap();
-            }
-
-            //Color true transitions green, false red
-            TailCfgInstruction::CondBranch { then_bb, else_bb, .. } => {
-                writeln!(
-                    output,
-                    "  BB{} -> BB{} [color=green];",
-                    bb.id.0, then_bb.0
-                ).unwrap();
-                writeln!(
-                    output,
-                    "  BB{} -> BB{} [color=red];",
-                    bb.id.0, else_bb.0
-                ).unwrap();
-            }
-            TailCfgInstruction::Return { .. } |
-            TailCfgInstruction::Undefined => { }
-        }
+        debug_graphviz(&mut output, bb, sema);
     }
     output.push_str("}\n");
     output

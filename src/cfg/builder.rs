@@ -1,6 +1,6 @@
 //! This module defines the [`CfgBuilder`] struct, which is responsible for constructing
 //! a Control Flow Graph (CFG) from a series of basic blocks and instructions.
-//! 
+//!
 //! It is used in the [`super::lower`] module to build the CFG during the lowering phase.
 
 use std::{
@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    cfg::{def::*, sema::SemaResults},
+    cfg::{def::*, display, sema::SemaResults},
     parser::{ast::VarId, span::Span},
 };
 
@@ -216,24 +216,10 @@ impl CfgBuilder {
         })
     }
 
-    pub(super) fn debug(&self) {
+    pub(super) fn debug(&self, sema: &SemaResults) {
         let mut s = String::new();
         for bb in &self.blocks {
-            writeln!(&mut s, "BB {:?}:", bb.id).unwrap();
-            for phi in &bb.phi {
-                writeln!(&mut s, "  Phi: {} = phi (", phi.dest).unwrap();
-
-                for (pred_bb, val) in &phi.sources {
-                    writeln!(&mut s, "    [{:?} => {}]", pred_bb, val).unwrap();
-                }
-                writeln!(&mut s, "  )").unwrap();
-            }
-            for instr in &bb.instructions {
-                writeln!(&mut s, "  Instr: {}", instr).unwrap();
-            }
-            writeln!(&mut s, "  Tail: {}", bb.tail).unwrap();
-            writeln!(&mut s, "  Successors: {:?}", bb.successors).unwrap();
-            writeln!(&mut s, "  Predecessors: {:?}", bb.predecessors).unwrap();
+            writeln!(s, "{}", bb.display_with_sema(sema)).unwrap();
         }
         println!("{}", s);
     }
@@ -241,69 +227,9 @@ impl CfgBuilder {
     pub(super) fn debug_graphviz(&self, sema: &SemaResults) -> String {
         let mut output = String::new();
         output.push_str("digraph CFG {\n");
+        output.push_str(display::GRAPHVIZ_HEADER);
         for bb in &self.blocks {
-            let s = {
-                let mut s = String::new();
-                writeln!(&mut s, "BB{}:", bb.id.0).unwrap();
-                for phi in &bb.phi {
-                    write!(&mut s, "  {} = Φ(", phi.dest).unwrap();
-                    for (i, (pred_bb, val)) in phi.sources.iter().enumerate() {
-                        if i > 0 {
-                            write!(&mut s, ", ").unwrap();
-                        }
-                        write!(&mut s, "{val}@BB{}", pred_bb.0).unwrap();
-                    }
-                    write!(&mut s, ")").unwrap();
-                    if let Some(var_id) = phi.var_id {
-                        write!(&mut s, " ({})", sema.var_name(var_id)).unwrap();
-                    }
-                    writeln!(&mut s).unwrap();
-                }
-                for instr in &bb.instructions {
-                    write!(&mut s, "  {}", instr).unwrap();
-                    let var_id = match instr {
-                        CfgInstruction::Assign { dest, .. } => dest.2,
-                        CfgInstruction::_AssignVar { var_id, .. } => Some(*var_id),
-                    };
-                    if let Some(var_id) = var_id {
-                        write!(&mut s, " ({})", sema.var_name(var_id)).unwrap();
-                    }
-                    writeln!(&mut s).unwrap();
-                }
-                match &bb.tail {
-                    TailCfgInstruction::Undefined => {
-                        s.push_str("undefined\n");
-                    }
-                    TailCfgInstruction::UncondBranch { target } => {
-                        writeln!(&mut s, "  br BB{}", target.0).unwrap();
-                    }
-                    TailCfgInstruction::CondBranch {
-                        cond,
-                        then_bb,
-                        else_bb,
-                    } => {
-                        writeln!(
-                            &mut s,
-                            "  br_cond {} ? BB{} : BB{}",
-                            cond, then_bb.0, else_bb.0
-                        )
-                        .unwrap();
-                    }
-                    TailCfgInstruction::Return { value } => match value {
-                        Some(v) => {
-                            writeln!(&mut s, "  return {}", v).unwrap();
-                        }
-                        None => {
-                            writeln!(&mut s, "  return").unwrap();
-                        }
-                    },
-                }
-                s
-            };
-            writeln!(output, "  BB{} [label={s:?}];", bb.id.0).unwrap();
-            for succ in &bb.successors {
-                writeln!(output, "  BB{} -> BB{};", bb.id.0, succ.0).unwrap();
-            }
+            display::debug_graphviz(&mut output, bb, sema);
         }
         output.push_str("}\n");
         output

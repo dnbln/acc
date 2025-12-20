@@ -46,10 +46,7 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 
 use crate::{
     cfg::{
-        builder::{CfgBuilder, ValidateError},
-        cleanup::{OptPassConfig, cleanup_passes},
-        def::*,
-        sema::SemaResults,
+        builder::{CfgBuilder, ValidateError}, cleanup::{OptPassConfig, cleanup_passes}, def::*, display, sema::SemaResults
     },
     diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
     parser::{
@@ -159,7 +156,7 @@ pub fn lower_ast_to_cfg(
         return Err(LowerError::MalformedPhiInfo(malformed));
     }
 
-    cleanup_passes(&mut builder, pass_config);
+    cleanup_passes(&mut builder, sema, pass_config);
 
     match builder.build(entry) {
         Ok(cfg) => Ok(cfg),
@@ -1529,8 +1526,7 @@ impl MalformedPhiInfo {
     pub fn display_in_graphviz(&self, sema: &SemaResults) -> String {
         let mut output = String::new();
         output.push_str("digraph MalformedPhiInfo {\n");
-        output.push_str("  node [shape=box, fontname=\"Courier New\", fontsize=10];\n");
-        output.push_str("  edge [fontname=\"Courier New\", fontsize=9];\n");
+        output.push_str(display::GRAPHVIZ_HEADER);
 
         let mut edges_missing_vars: BTreeMap<(BBId, BBId), BTreeSet<VarId>> = BTreeMap::new();
 

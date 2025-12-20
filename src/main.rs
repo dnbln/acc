@@ -114,50 +114,98 @@ enum OptStageRef {
     TailUnification,
     #[value(name = "tdb")]
     TrimDeadBlocks,
+    #[value(name = "dbg")]
+    Debug,
+    #[value(name = "dbgv")]
+    DebugGraphviz,
 }
 
 impl OptStageRef {
     fn build_pipeline(passes: &[OptStageRef]) -> OptPassConfig {
         let mut opt_config = OptPassConfig::new(vec![]);
+        let mut wrap_with_debug = false;
+        let mut wrap_with_debug_graphviz = false;
+
+        macro_rules! wrap {
+            ($name:literal, $stmt:stmt) => {
+                if wrap_with_debug {
+                    opt_config.push_pass(OptPass::Debug {
+                        name: concat!("before ", $name),
+                    });
+                }
+                if wrap_with_debug_graphviz {
+                    opt_config.push_pass(OptPass::DebugGraphviz {
+                        name: concat!("before ", $name),
+                    });
+                }
+                $stmt
+                if wrap_with_debug {
+                    opt_config.push_pass(OptPass::Debug { name: concat!("after ", $name) });
+                }
+                if wrap_with_debug_graphviz {
+                    opt_config.push_pass(OptPass::DebugGraphviz { name: concat!("after ", $name) });
+                }
+                wrap_with_debug = false;
+                wrap_with_debug_graphviz = false;
+            };
+        }
 
         for pass in passes {
             match pass {
                 OptStageRef::None => {}
                 OptStageRef::Full => {
-                    opt_config.join(OptPassConfig::full());
+                    wrap!("Full", opt_config.join(OptPassConfig::full()));
                 }
                 OptStageRef::ConstantPropagation => {
-                    opt_config.push_pass(OptPass::ConstantPropagation);
+                    wrap!(
+                        "ConstantPropagation",
+                        opt_config.push_pass(OptPass::ConstantPropagation)
+                    );
                 }
                 OptStageRef::DeadValueElimination => {
-                    opt_config.push_pass(OptPass::DeadValueElimination);
+                    wrap!(
+                        "DeadValueElimination",
+                        opt_config.push_pass(OptPass::DeadValueElimination)
+                    );
                 }
                 OptStageRef::BlockInliner => {
-                    opt_config.push_pass(OptPass::BlockInliner);
+                    wrap!("BlockInliner", opt_config.push_pass(OptPass::BlockInliner));
                 }
                 OptStageRef::HoistPass => {
-                    opt_config.push_pass(OptPass::HoistPass);
+                    wrap!("HoistPass", opt_config.push_pass(OptPass::HoistPass));
                 }
                 OptStageRef::PhiSimplification => {
-                    opt_config.push_pass(OptPass::PhiSimplification);
+                    wrap!(
+                        "PhiSimplification",
+                        opt_config.push_pass(OptPass::PhiSimplification)
+                    );
                 }
                 OptStageRef::ValueInliner => {
-                    opt_config.push_pass(OptPass::ValueInliner);
+                    wrap!("ValueInliner", opt_config.push_pass(OptPass::ValueInliner));
                 }
                 OptStageRef::ValueInlinerPhiSimplificationLoop => {
-                    opt_config.push_pass(OptPass::ValueInlinerPhiSimplificationLoop);
+                    wrap!(
+                        "ValueInlinerPhiSimplificationLoop",
+                        opt_config.push_pass(OptPass::ValueInlinerPhiSimplificationLoop)
+                    );
                 }
                 OptStageRef::PhiToSelect => {
-                    opt_config.push_pass(OptPass::PhiToSelect);
+                    wrap!("PhiToSelect", opt_config.push_pass(OptPass::PhiToSelect));
                 }
                 OptStageRef::BlockDedup => {
-                    opt_config.push_pass(OptPass::BlockDedup);
+                    wrap!("BlockDedup", opt_config.push_pass(OptPass::BlockDedup));
                 }
                 OptStageRef::TailUnification => {
-                    opt_config.push_pass(OptPass::TailUnification);
+                    wrap!("TailUnification", opt_config.push_pass(OptPass::TailUnification));
                 }
                 OptStageRef::TrimDeadBlocks => {
-                    opt_config.push_pass(OptPass::TrimDeadBlocks);
+                    wrap!("TrimDeadBlocks", opt_config.push_pass(OptPass::TrimDeadBlocks));
+                }
+                OptStageRef::Debug => {
+                    wrap_with_debug = true;
+                }
+                OptStageRef::DebugGraphviz => {
+                    wrap_with_debug_graphviz = true;
                 }
             }
         }
