@@ -270,7 +270,8 @@ fn lower_stmt_to_block(
             //                                 exit_bb
             //                                    |
             //                             (continuation)
-            let mut then_bb = builder.create_bb();
+            let init_then_bb = builder.create_bb();
+            let mut then_bb = init_then_bb;
 
             let cond_val = lower_expr(builder, bb_id, cond, sema, semantic_errors);
 
@@ -286,7 +287,8 @@ fn lower_stmt_to_block(
             );
             // Lower else branch
             if let Some(else_branch) = else_branch {
-                let mut else_bb = builder.create_bb();
+                let init_else_bb = builder.create_bb();
+                let mut else_bb = init_else_bb;
                 lower_block_to_block(
                     builder,
                     &mut else_bb,
@@ -308,8 +310,8 @@ fn lower_stmt_to_block(
                     *bb_id,
                     TailCfgInstruction::CondBranch {
                         cond: cond_val,
-                        then_bb,
-                        else_bb,
+                        then_bb: init_then_bb,
+                        else_bb: init_else_bb,
                     },
                 );
 
@@ -326,7 +328,7 @@ fn lower_stmt_to_block(
                     *bb_id,
                     TailCfgInstruction::CondBranch {
                         cond: cond_val,
-                        then_bb,
+                        then_bb: init_then_bb,
                         else_bb: exit_bb,
                     },
                 );
@@ -366,25 +368,28 @@ fn lower_stmt_to_block(
             //                                         |                              |
             //                                  br entry_bb -->------------------------
 
-            let mut entry = builder.create_bb();
-            let mut body_bb = builder.create_bb();
+            let init_entry = builder.create_bb();
+            let mut entry = init_entry;
 
             builder
                 .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: entry });
 
             let cond_val = lower_expr(builder, &mut entry, cond, sema, semantic_errors);
 
+            let init_body_bb = builder.create_bb();
+            let mut body_bb = init_body_bb;
+
             let exit_bb = builder.create_bb();
             builder.set_tail_instruction(
                 entry,
                 TailCfgInstruction::CondBranch {
                     cond: cond_val,
-                    then_bb: body_bb,
+                    then_bb: init_body_bb,
                     else_bb: exit_bb,
                 },
             );
             let loop_refs = ControlFlowLoopRefs {
-                continue_bb: entry,
+                continue_bb: init_entry,
                 exit_bb,
             };
             // Lower body
@@ -400,7 +405,7 @@ fn lower_stmt_to_block(
             if !builder.bb_has_tail(body_bb) {
                 builder.set_tail_instruction(
                     body_bb,
-                    TailCfgInstruction::UncondBranch { target: entry },
+                    TailCfgInstruction::UncondBranch { target: init_entry },
                 );
             }
             *bb_id = exit_bb;
@@ -458,13 +463,16 @@ fn lower_stmt_to_block(
                 );
             }
 
-            let mut entry = builder.create_bb();
-            let mut body_bb = builder.create_bb();
-            let mut update_bb = builder.create_bb();
+            let init_entry = builder.create_bb();
+            let mut entry = init_entry;
+            let init_body_bb = builder.create_bb();
+            let mut body_bb = init_body_bb;
+            let init_update_bb = builder.create_bb();
+            let mut update_bb = init_update_bb;
             let exit_bb = builder.create_bb();
 
             builder
-                .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: entry });
+                .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: init_entry });
 
             match cond {
                 Some(cond_expr) => {
@@ -474,7 +482,7 @@ fn lower_stmt_to_block(
                         entry,
                         TailCfgInstruction::CondBranch {
                             cond: cond_val,
-                            then_bb: body_bb,
+                            then_bb: init_body_bb,
                             else_bb: exit_bb,
                         },
                     );
@@ -482,12 +490,12 @@ fn lower_stmt_to_block(
                 None => {
                     builder.set_tail_instruction(
                         entry,
-                        TailCfgInstruction::UncondBranch { target: body_bb },
+                        TailCfgInstruction::UncondBranch { target: init_body_bb },
                     );
                 }
             }
             let loop_refs = ControlFlowLoopRefs {
-                continue_bb: update_bb,
+                continue_bb: init_update_bb,
                 exit_bb,
             };
             // Lower body
@@ -504,7 +512,9 @@ fn lower_stmt_to_block(
             if !builder.bb_has_tail(body_bb) {
                 builder.set_tail_instruction(
                     body_bb,
-                    TailCfgInstruction::UncondBranch { target: update_bb },
+                    TailCfgInstruction::UncondBranch {
+                        target: init_update_bb,
+                    },
                 );
             }
             if let Some(update_expr) = update {
@@ -512,7 +522,7 @@ fn lower_stmt_to_block(
             }
             builder.set_tail_instruction(
                 update_bb,
-                TailCfgInstruction::UncondBranch { target: entry },
+                TailCfgInstruction::UncondBranch { target: init_entry },
             );
             *bb_id = exit_bb;
         }
@@ -1727,6 +1737,8 @@ impl MalformedPhiInfo {
 /// generate diagnostics later, as well as a graphviz representation of the malformed CFG, pointing
 /// out the missing sources for each malformed phi/assignment, as well as the missing variables on edges.
 fn malformed_phi_reduction(builder: &mut CfgBuilder, sema: &SemaResults) -> MalformedPhiInfo {
+    println!("{}", builder.debug_graphviz(sema));
+
     let mut infos = Vec::new();
     let mut phi_assignments = Vec::new();
     let mut removed_vals = BTreeSet::new();
