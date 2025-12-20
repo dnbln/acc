@@ -1,0 +1,27 @@
+STDOUT:
+CFG for function main:
+BBId(0): % preds = []
+  %0 = const.i64 0
+  return %0
+
+
+
+STDERR:
+note: Name resolution
+  ┌─ tests/ref_self_in_initializer_uses_parent_scope.c:5:17
+  │
+3 │     int x = 0;
+  │         - Resolved to VarId(0)
+4 │     {
+5 │         int x = x;
+  │                 ^ Ref at RefId(0)
+
+note: Name resolution
+  ┌─ tests/ref_self_in_initializer_uses_parent_scope.c:8:12
+  │
+3 │     int x = 0;
+  │         - Resolved to VarId(0)
+  ·
+8 │     return x;
+  │            ^ Ref at RefId(1)
+

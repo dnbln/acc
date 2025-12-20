@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: unexpected token
+  ┌─ tests/unclosed_paren.c:3:19
+  │
+3 │     int x = (1 + 2;
+  │                   ^ expected ')', found ';'
+
+Error: Parsing failed

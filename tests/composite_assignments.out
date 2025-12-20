@@ -1,0 +1,22 @@
+STDOUT:
+CFG for function main:
+BBId(0): % preds = []
+  %0 = const.i64 1
+  %23 = const.i64 10 [var x]
+  %24 = const.i64 20 [var x]
+  %22 = select %0, %23, %24 [var x]
+  %5 = const.i64 2
+  %6 = add %22, %5 [var x]
+  %8 = const.i64 3
+  %9 = sub %6, %8 [var x]
+  %11 = const.i64 4
+  %12 = mul %9, %11 [var x]
+  %14 = const.i64 5
+  %15 = div %12, %14 [var x]
+  %17 = const.i64 6
+  %18 = mod %15, %17 [var x]
+  return %18
+
+
+
+STDERR:

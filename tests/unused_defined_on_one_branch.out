@@ -1,0 +1,9 @@
+STDOUT:
+CFG for function main:
+BBId(0): % preds = []
+  %2 = const.i64 0
+  return %2
+
+
+
+STDERR:

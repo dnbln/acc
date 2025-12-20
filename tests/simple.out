@@ -1,0 +1,69 @@
+STDOUT:
+Parsed function: main
+Parameters: []
+Return Type: Spanned {
+    node: Int,
+    span: 21..24,
+}
+Body: Some(
+    Spanned {
+        node: Block {
+            stmts: [
+                Spanned {
+                    node: While {
+                        cond: Spanned {
+                            node: IntLit(
+                                1,
+                            ),
+                            span: 45..46,
+                        },
+                        body: Spanned {
+                            node: Block(
+                                Spanned {
+                                    node: Block {
+                                        stmts: [],
+                                    },
+                                    span: 48..50,
+                                },
+                            ),
+                            span: 48..50,
+                        },
+                    },
+                    span: 38..50,
+                },
+                Spanned {
+                    node: Return(
+                        Some(
+                            Spanned {
+                                node: IntLit(
+                                    0,
+                                ),
+                                span: 62..63,
+                            },
+                        ),
+                    ),
+                    span: 55..64,
+                },
+            ],
+        },
+        span: 32..66,
+    },
+)
+CFG for function main:
+BBId(0): % preds = []
+  br BBId(1)
+
+BBId(1): % preds = [BBId(0), BBId(2)]
+  %0 = const.i64 1
+  br_cond %0 ? BBId(2) : BBId(3)
+
+BBId(2): % preds = [BBId(1)]
+  br BBId(1)
+
+BBId(3): % preds = [BBId(1)]
+  %1 = const.i64 0
+  return %1
+
+
+
+STDERR:

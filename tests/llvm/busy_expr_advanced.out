@@ -1,0 +1,58 @@
+STDOUT:
+CFG for function f:
+BBId(0): % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %49 = sub %0, %1
+  %51 = select %13, %49, %4 [var x]
+  %52 = select %13, %7, %49 [var y]
+  %31 = mul %51, %52
+  %33 = add %31, %10
+  return %33
+
+
+Generated LLVM IR:
+; ModuleID = 'module'
+source_filename = "module"
+
+define i64 @f(i64 %0, i64 %1) {
+bb0:
+  %add = add i64 %0, %1
+  %mul = mul i64 %0, %1
+  %idiv = sdiv i64 %0, %1
+  %cmp = icmp slt i64 %0, %1
+  %sub = sub i64 %0, %1
+  %select = select i1 %cmp, i64 %sub, i64 %add
+  %select1 = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %select, %select1
+  %add3 = add i64 %mul2, %idiv
+  ret i64 %add3
+}
+
+Optimized LLVM IR:
+; ModuleID = 'module'
+source_filename = "module"
+
+; Function Attrs: mustprogress nofree norecurse nosync nounwind willreturn memory(none)
+define i64 @f(i64 %0, i64 %1) local_unnamed_addr #0 {
+bb0:
+  %add = add i64 %1, %0
+  %mul = mul i64 %1, %0
+  %idiv = sdiv i64 %0, %1
+  %cmp = icmp slt i64 %0, %1
+  %sub = sub i64 %0, %1
+  %select = select i1 %cmp, i64 %sub, i64 %add
+  %select1 = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %select, %select1
+  %add3 = add i64 %idiv, %mul2
+  ret i64 %add3
+}
+
+attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
+
+
+STDERR:

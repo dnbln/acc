@@ -1,0 +1,22 @@
+STDOUT:
+
+STDERR:
+CFG lowering error in function main: MalformedPhiInfo(MalformedPhiInfo { infos: [], malformed_assignments: [SingleMalformedAssignmentInfo { bb_id: BBId(0), dest_val: ValueRef(0, 43..44, Some(VarId(0)), None), assigned_val: _VarId(VarId(0)), missing_sources: {} }], phi_assignments: [], malformed_tails: [SingleMalformedTailInfo { bb_id: BBId(0), missing_sources: {} }], blocks: [BasicBlock { id: BBId(0), phi: [], instructions: [Assign { dest: ValueRef(0, 43..44, Some(VarId(0)), None), val: _VarId(VarId(0)) }], tail: Return { value: Some(ValueRef(0, 43..44, Some(VarId(0)), None)) }, successors: [], predecessors: [] }] })
+error: Use before initialization detected during CFG lowering
+  ┌─ tests/bad_dataflow_2.c:4:12
+  │
+3 │     int x;
+  │         - Variable declaration site
+4 │     return x;
+  │            ^ value not valid (not yet initialized)
+  │
+  = note: this means that you are trying to use a variable that has not been assigned a value yet
+
+---
+digraph MalformedPhiInfo {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  BB0 [label="BB0:\n    %0 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %0\n"];
+}
+
+Error: CFG lowering failed

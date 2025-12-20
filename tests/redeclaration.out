@@ -1,0 +1,12 @@
+STDOUT:
+
+STDERR:
+error: Redeclared variable
+  ┌─ tests/redeclaration.c:4:9
+  │
+3 │     int x = 0;
+  │         - Previous declaration of 'x' here
+4 │     int x = 5;
+  │         ^ The variable 'x' is redeclared in the same scope
+
+Error: Semantic analysis failed

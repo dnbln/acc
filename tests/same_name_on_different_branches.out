@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: Undefined variable
+  ┌─ tests/same_name_on_different_branches.c:9:12
+  │
+9 │     return x;
+  │            ^ The variable 'x' is not defined
+
+Error: Semantic analysis failed

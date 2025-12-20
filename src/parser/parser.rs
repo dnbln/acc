@@ -1,14 +1,19 @@
+use crate::parser::ast::{Block, Program, RefId, VarId};
+use crate::parser::span::Span;
+
 use super::ast::{Expr, Function, Stmt, TopLevel, Type};
 use super::error::{ParseError, ParseErrorKind, ParseResult};
 use super::operator::{OpConfig, c_operators};
 use super::span::Spanned;
 use super::token::{Token, TokenKind};
-use logos::{Logos, Span};
+use logos::Logos;
 
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
     config: OpConfig,
+    var_counter: VarId,
+    ref_counter: RefId,
 }
 
 impl Parser {
@@ -20,8 +25,20 @@ impl Parser {
 
         for (result, span) in TokenKind::lexer(input.as_ref()).spanned() {
             match result {
-                Ok(kind) => tokens.push(Token { kind, span }),
-                Err(_) => errors.push(ParseError::new(ParseErrorKind::InvalidToken, span)),
+                Ok(kind) => tokens.push(Token {
+                    kind,
+                    span: Span {
+                        start: span.start,
+                        end: span.end,
+                    },
+                }),
+                Err(_) => errors.push(ParseError::new(
+                    ParseErrorKind::InvalidToken,
+                    Span {
+                        start: span.start,
+                        end: span.end,
+                    },
+                )),
             }
         }
 
@@ -31,14 +48,31 @@ impl Parser {
 
         tokens.push(Token {
             kind: TokenKind::Eof,
-            span: source_len..source_len,
+            span: Span {
+                start: source_len,
+                end: source_len,
+            },
         });
 
         Ok(Parser {
             tokens,
             pos: 0,
             config,
+            var_counter: VarId(0),
+            ref_counter: RefId(0),
         })
+    }
+
+    fn allocate_var_id(&mut self) -> VarId {
+        let var_id = self.var_counter;
+        self.var_counter.0 += 1;
+        var_id
+    }
+
+    fn allocate_ref_id(&mut self) -> RefId {
+        let ref_id = self.ref_counter;
+        self.ref_counter.0 += 1;
+        ref_id
     }
 
     // Utility methods to interact with tokens
@@ -51,7 +85,7 @@ impl Parser {
     }
 
     fn current_span(&self) -> Span {
-        self.tokens[self.pos].span.clone()
+        self.tokens[self.pos].span
     }
 
     fn advance(&mut self) -> Token {
@@ -94,7 +128,7 @@ impl Parser {
         } else {
             start
         };
-        start..end
+        Span { start, end }
     }
 
     fn parse_type(&mut self) -> ParseResult<Spanned<Type>> {
@@ -111,6 +145,10 @@ impl Parser {
             TokenKind::Char => {
                 self.advance();
                 Type::Char
+            }
+            TokenKind::Bool => {
+                self.advance();
+                Type::Bool
             }
             _ => {
                 return Err(ParseError::new(
@@ -146,6 +184,30 @@ impl Parser {
         Ok((ty, name))
     }
 
+    fn parse_typed_ident_with_var_id(
+        &mut self,
+    ) -> ParseResult<(Spanned<Type>, Spanned<String>, VarId)> {
+        let ty = self.parse_type()?;
+
+        let name_tok = self.peek().clone();
+        let name = match &name_tok.kind {
+            TokenKind::Ident(n) => {
+                self.advance();
+                Spanned::new(n.clone(), name_tok.span)
+            }
+            _ => {
+                return Err(ParseError::new(
+                    ParseErrorKind::ExpectedIdentifier {
+                        found: name_tok.kind.description().to_string(),
+                    },
+                    name_tok.span,
+                ));
+            }
+        };
+
+        Ok((ty, name, self.allocate_var_id()))
+    }
+
     // Cool blog post:
     // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     pub fn parse_expr(&mut self) -> ParseResult<Spanned<Expr>> {
@@ -174,30 +236,34 @@ impl Parser {
             }
 
             // Postfix operators
-            if let Some(op_str) = self.peek_kind().as_op_str() {
-                if let Some(bp) = self.config.get_postfix(op_str) {
-                    if bp >= min_bp {
-                        let op = op_str.to_string();
-                        let op_span = self.current_span();
-                        self.advance();
-                        let span = self.span_from(start);
-                        lhs = Spanned::new(
-                            Expr::UnaryOp {
-                                op: Spanned::new(op, op_span),
-                                expr: Box::new(lhs),
-                                prefix: false,
-                            },
-                            span,
-                        );
-                        continue;
+            {
+                let kind = self.peek_kind();
+                if let Some(op_str) = kind.as_op_str() {
+                    if let Some(bp) = self.config.get_postfix(op_str) {
+                        if bp >= min_bp {
+                            let op = kind.as_unary_op().unwrap();
+                            let op_span = self.current_span();
+                            self.advance();
+                            let span = self.span_from(start);
+                            lhs = Spanned::new(
+                                Expr::UnaryOp {
+                                    op: Spanned::new(op, op_span),
+                                    expr: Box::new(lhs),
+                                    prefix: false,
+                                },
+                                span,
+                            );
+                            continue;
+                        }
                     }
                 }
             }
 
             // Infix operators
-            let (op, l_bp, r_bp) = match self.peek_kind().as_op_str() {
+            let kind = self.peek_kind();
+            let (op, l_bp, r_bp) = match kind.as_op_str() {
                 Some(op_str) => match self.config.get_infix(op_str) {
-                    Some((l, r)) => (op_str.to_string(), l, r),
+                    Some((l, r)) => (kind.as_binary_op().unwrap(), l, r),
                     None => break,
                 },
                 None => break,
@@ -238,7 +304,8 @@ impl Parser {
             TokenKind::Ident(name) => {
                 let name = name.clone();
                 self.advance();
-                Ok(Spanned::new(Expr::Ident(name), tok.span))
+                let ref_id = self.allocate_ref_id();
+                Ok(Spanned::new(Expr::Ident(ref_id, name), tok.span))
             }
             TokenKind::LParen => {
                 let lparen = self.advance();
@@ -259,7 +326,7 @@ impl Parser {
             _ => {
                 if let Some(op_str) = tok.kind.as_op_str() {
                     if let Some(bp) = self.config.get_prefix(op_str) {
-                        let op = op_str.to_string();
+                        let op = tok.kind.as_unary_op().unwrap();
                         self.advance();
                         let expr = self.parse_expr_bp(bp)?;
                         let span = self.span_from(start);
@@ -326,7 +393,12 @@ impl Parser {
         let start = self.current_span().start;
 
         let stmt = match self.peek_kind() {
-            TokenKind::LBrace => return self.parse_block(),
+            TokenKind::LBrace => {
+                return self.parse_block().map(|b| {
+                    let span = b.span;
+                    Spanned::new(Stmt::Block(b), span)
+                });
+            }
             TokenKind::If => return self.parse_if(),
             TokenKind::While => return self.parse_while(),
             TokenKind::For => return self.parse_for(),
@@ -353,7 +425,7 @@ impl Parser {
         Ok(Spanned::new(stmt, span))
     }
 
-    fn parse_block(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_block(&mut self) -> ParseResult<Spanned<Block>> {
         let current = self.current_span();
         let lbrace = self.expect(TokenKind::LBrace)?;
         let mut stmts = Vec::new();
@@ -374,7 +446,7 @@ impl Parser {
 
         self.expect(TokenKind::RBrace)?;
         let span = self.span_from(current.start);
-        Ok(Spanned::new(Stmt::Block(stmts), span))
+        Ok(Spanned::new(Block { stmts }, span))
     }
 
     fn parse_if(&mut self) -> ParseResult<Spanned<Stmt>> {
@@ -394,11 +466,11 @@ impl Parser {
         }
         self.expect(TokenKind::RParen)?;
 
-        let then_branch = Box::new(self.parse_stmt()?);
+        let then_branch = self.parse_block()?;
 
         let else_branch = if self.next_is(&TokenKind::Else) {
             self.advance();
-            Some(Box::new(self.parse_stmt()?))
+            Some(self.parse_block()?)
         } else {
             None
         };
@@ -503,7 +575,15 @@ impl Parser {
         };
         self.expect(TokenKind::Semi)?;
         let span = self.span_from(start);
-        Ok(Spanned::new(Stmt::VarDecl { ty, name, init }, span))
+        Ok(Spanned::new(
+            Stmt::VarDecl {
+                id: self.allocate_var_id(),
+                ty,
+                name,
+                init,
+            },
+            span,
+        ))
     }
 
     // Function Parsing
@@ -529,12 +609,15 @@ impl Parser {
 
         let span = self.span_from(start);
         Ok(Spanned::new(
-            TopLevel::Function(Function {
-                return_type: ty,
-                name,
-                params,
-                body,
-            }),
+            TopLevel::Function(
+                Function {
+                    return_type: ty,
+                    name,
+                    params,
+                    body,
+                },
+                self.allocate_var_id(),
+            ),
             span,
         ))
     }
@@ -542,7 +625,7 @@ impl Parser {
     fn parse_params(
         &mut self,
         lparen_span: Span,
-    ) -> ParseResult<Vec<(Spanned<Type>, Spanned<String>)>> {
+    ) -> ParseResult<Vec<(Spanned<Type>, Spanned<String>, VarId)>> {
         let mut params = Vec::new();
 
         if self.next_is(&TokenKind::RParen) {
@@ -559,10 +642,10 @@ impl Parser {
             ));
         }
 
-        params.push(self.parse_typed_ident()?);
+        params.push(self.parse_typed_ident_with_var_id()?);
         while self.next_is(&TokenKind::Comma) {
             self.advance();
-            params.push(self.parse_typed_ident()?);
+            params.push(self.parse_typed_ident_with_var_id()?);
         }
 
         Ok(params)
@@ -582,13 +665,13 @@ impl Parser {
     }
 
     // Main parsing loop
-    pub fn parse_program(&mut self) -> ParseResult<Vec<Spanned<TopLevel>>> {
+    pub fn parse_program(&mut self) -> ParseResult<Program> {
         let mut items = Vec::new();
 
         while !self.next_is(&TokenKind::Eof) {
             items.push(self.parse_fn()?);
         }
 
-        Ok(items)
+        Ok(Program { items })
     }
 }

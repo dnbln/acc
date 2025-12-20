@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: invalid token
+  ┌─ tests/invalid_operator.c:3:16
+  │
+3 │     int x = 10 @ 5;
+  │                ^ unrecognized character sequence
+
+Error: Could not tokenize input

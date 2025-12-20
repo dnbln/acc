@@ -1,0 +1,10 @@
+STDOUT:
+
+STDERR:
+error: expected expression
+  ┌─ tests/unexpected_token.c:3:12
+  │
+3 │     return return;
+  │            ^^^^^^ expected expression, found 'return'
+
+Error: Parsing failed
