@@ -28,8 +28,6 @@ struct Args {
     cfg: bool,
 
     /// Optimization passes to run, in order.
-    ///
-    /// full = vips,cp,dve,bi,hp,vips,phi2sel,bd,tu,dve,tdb,bi
     #[clap(long, value_enum, value_name = "OPT", value_delimiter = ',', num_args = 1.., default_value = "full")]
     opt: Vec<OptMetaStageRef>,
 
@@ -95,28 +93,40 @@ fn display_cfg_errors(
 
 #[derive(Debug, clap::ValueEnum, Clone, Copy)]
 enum OptStageRef {
+    /// Constant Propagation
     #[value(name = "cp")]
     ConstantPropagation,
+    /// Dead Value Elimination
     #[value(name = "dve")]
     DeadValueElimination,
+    /// Constant Propagation + Dead Value Elimination + Trim Dead Blocks Loop
     #[value(name = "cpdvetdb")]
     ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop,
+    /// Block Inliner
     #[value(name = "bi")]
     BlockInliner,
+    /// Hoist Pass
     #[value(name = "hp")]
     HoistPass,
+    /// Phi Simplification
     #[value(name = "ps")]
     PhiSimplification,
+    /// Value Inliner
     #[value(name = "vi")]
     ValueInliner,
+    /// Value Inliner + Phi Simplification Loop
     #[value(name = "vips")]
     ValueInlinerPhiSimplificationLoop,
+    /// Phi to Select pass
     #[value(name = "phi2sel")]
     PhiToSelect,
+    /// Block Deduplication
     #[value(name = "bd")]
     BlockDedup,
+    /// Tail Unification
     #[value(name = "tu")]
     TailUnification,
+    /// Trim Dead Blocks
     #[value(name = "tdb")]
     TrimDeadBlocks,
 }
@@ -148,34 +158,49 @@ impl From<OptStageRef> for OptPass {
 enum OptMetaStageRef {
     #[value(name = "none")]
     None,
+    /// Full pipeline of optimizations [full = vips,cpdvetdb,bi,hp,vips,phi2sel,bd,tu,dve,tdb,bi]
     #[value(name = "full")]
     Full,
+    /// Constant Propagation
     #[value(name = "cp")]
     ConstantPropagation,
+    /// Dead Value Elimination
     #[value(name = "dve")]
     DeadValueElimination,
+    /// Constant Propagation + Dead Value Elimination + Trim Dead Blocks Loop
     #[value(name = "cpdvetdb")]
     ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop,
+    /// Block Inliner
     #[value(name = "bi")]
     BlockInliner,
+    /// Hoist Pass
     #[value(name = "hp")]
     HoistPass,
+    /// Phi Simplification
     #[value(name = "ps")]
     PhiSimplification,
+    /// Value Inliner
     #[value(name = "vi")]
     ValueInliner,
+    /// Value Inliner + Phi Simplification Loop
     #[value(name = "vips")]
     ValueInlinerPhiSimplificationLoop,
+    /// Phi to Select pass
     #[value(name = "phi2sel")]
     PhiToSelect,
+    /// Block Deduplication
     #[value(name = "bd")]
     BlockDedup,
+    /// Tail Unification
     #[value(name = "tu")]
     TailUnification,
+    /// Trim Dead Blocks
     #[value(name = "tdb")]
     TrimDeadBlocks,
+    /// Debug dump before and after the next pass
     #[value(name = "dbg")]
     Debug,
+    /// Debug Graphviz dump before and after the next pass
     #[value(name = "dbgv")]
     DebugGraphviz,
 }
