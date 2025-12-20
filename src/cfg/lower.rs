@@ -70,6 +70,7 @@ pub enum SemanticError {
 #[derive(Debug)]
 pub enum CfgWarning {
     UnreachableCode(Span),
+    UnusedValue(Span),
 }
 
 impl IntoDiagnostic for CfgWarning {
@@ -83,6 +84,12 @@ impl IntoDiagnostic for CfgWarning {
                             .with_message("this code is unreachable"),
                     ])
             }
+            CfgWarning::UnusedValue(span) => codespan_reporting::diagnostic::Diagnostic::warning()
+                .with_message("unused value")
+                .with_labels(vec![
+                    codespan_reporting::diagnostic::Label::primary(file_id, span.range())
+                        .with_message("this value is computed but never used"),
+                ]),
         }
     }
 }
@@ -161,6 +168,8 @@ pub fn lower_ast_to_cfg(
     }
 
     cleanup_passes(&mut builder, sema, pass_config);
+
+    warnings.extend(std::mem::take(&mut builder.cfg_warnings));
 
     match builder.build(entry) {
         Ok(cfg) => Ok(cfg),
@@ -471,8 +480,10 @@ fn lower_stmt_to_block(
             let mut update_bb = init_update_bb;
             let exit_bb = builder.create_bb();
 
-            builder
-                .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: init_entry });
+            builder.set_tail_instruction(
+                *bb_id,
+                TailCfgInstruction::UncondBranch { target: init_entry },
+            );
 
             match cond {
                 Some(cond_expr) => {
@@ -490,7 +501,9 @@ fn lower_stmt_to_block(
                 None => {
                     builder.set_tail_instruction(
                         entry,
-                        TailCfgInstruction::UncondBranch { target: init_body_bb },
+                        TailCfgInstruction::UncondBranch {
+                            target: init_body_bb,
+                        },
                     );
                 }
             }

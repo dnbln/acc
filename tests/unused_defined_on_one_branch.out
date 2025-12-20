@@ -7,3 +7,15 @@ bb0: % preds = []
 
 
 STDERR:
+warning: unused value
+  ┌─ tests/unused_defined_on_one_branch.c:4:17
+  │
+4 │         int x = 5;
+  │                 ^ this value is computed but never used
+
+warning: unused value
+  ┌─ tests/unused_defined_on_one_branch.c:3:9
+  │
+3 │     if (1) {
+  │         ^ this value is computed but never used
+

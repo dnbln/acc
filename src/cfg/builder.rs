@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    cfg::{def::*, display, sema::SemaResults},
+    cfg::{def::*, display, lower::CfgWarning, sema::SemaResults},
     parser::{ast::VarId, span::Span},
 };
 
@@ -17,6 +17,7 @@ pub struct CfgBuilder {
     next_bb_id: BBId,
     next_value_ref: usize,
     pub(super) blocks: Vec<BasicBlock>,
+    pub(super) cfg_warnings: Vec<CfgWarning>,
 }
 
 impl CfgBuilder {
@@ -25,6 +26,7 @@ impl CfgBuilder {
             next_bb_id: BBId(0),
             next_value_ref: 0,
             blocks: Vec::new(),
+            cfg_warnings: Vec::new(),
         };
         let entry = builder.create_bb();
         (builder, entry)

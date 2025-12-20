@@ -22,6 +22,7 @@ use crate::cfg::{
         ValueRefOrConst,
     },
     display,
+    lower::CfgWarning,
     sema::SemaResults,
 };
 
@@ -190,6 +191,9 @@ fn val_inliner(builder: &mut CfgBuilder) -> bool {
             }
         }
     }
+
+    let to_remove = equalities.keys().cloned().collect();
+    builder.remove_dead_values(&to_remove);
 
     changed
 }
@@ -370,17 +374,28 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) -> bool {
         let old_phi_count = bb.phi.len();
         bb.phi.retain(|phi| live_values.contains(&phi.dest));
         changed |= old_phi_count != bb.phi.len();
-        let old_instr_count = bb.instructions.len();
-        bb.instructions.retain(|instr| {
-            if let CfgInstruction::Assign { dest, val: _ } = instr
-                && !live_values.contains(dest)
-            {
-                false
-            } else {
-                true
+        let extracted = bb
+            .instructions
+            .extract_if(0..bb.instructions.len(), |instr| {
+                if let CfgInstruction::Assign { dest, val: _ } = instr
+                    && !live_values.contains(dest)
+                {
+                    true
+                } else {
+                    false
+                }
+            })
+            .collect::<Vec<_>>();
+        for instr in &extracted {
+            if CfgBuilder::is_optimized_phi(instr).is_some() {
+                // don't warn about phis and generally values tracking from one block to another
+                continue;
             }
-        });
-        changed |= old_instr_count != bb.instructions.len();
+            if let CfgInstruction::Assign { dest, val: _ } = instr {
+                builder.cfg_warnings.push(CfgWarning::UnusedValue(dest.1));
+            }
+        }
+        changed |= !extracted.is_empty();
     }
 
     changed
@@ -1152,7 +1167,40 @@ fn compute_top_level(
 /// This part is handled separately from the "top-level" hoisting algorithm outlined above, since it only works on one
 /// level of conditional branches at a time.
 fn hoist_pass(builder: &mut CfgBuilder) {
-    let mut doms = dominated_sets(builder);
+    let doms = dominated_sets(builder);
+
+    /// Canonicalize commutative RValues for matching
+    fn canonicalize(rvalue: &RValue) -> RValue {
+        match rvalue {
+            RValue::Add { left, right } => {
+                if left < right {
+                    RValue::Add {
+                        left: left.clone(),
+                        right: right.clone(),
+                    }
+                } else {
+                    RValue::Add {
+                        left: right.clone(),
+                        right: left.clone(),
+                    }
+                }
+            }
+            RValue::Mul { left, right } => {
+                if left < right {
+                    RValue::Mul {
+                        left: left.clone(),
+                        right: right.clone(),
+                    }
+                } else {
+                    RValue::Mul {
+                        left: right.clone(),
+                        right: left.clone(),
+                    }
+                }
+            }
+            _ => rvalue.clone(),
+        }
+    }
 
     loop {
         let mut changed = false;
@@ -1164,7 +1212,10 @@ fn hoist_pass(builder: &mut CfgBuilder) {
                     // only hoist pure RValues, calls may have side effects, and hoisitng function references is not useful
                     && !matches!(val, RValue::Call { .. } | RValue::Function { .. })
                 {
-                    exprs.entry(val.clone()).or_default().push((bb.id, *dest));
+                    exprs
+                        .entry(canonicalize(val))
+                        .or_default()
+                        .push((bb.id, *dest));
                 }
             }
         }
@@ -1338,7 +1389,7 @@ fn hoist_pass(builder: &mut CfgBuilder) {
                                 continue;
                             }
                         }
-                        then_exprs.insert(val.clone(), *dest);
+                        then_exprs.insert(canonicalize(val), *dest);
                     }
                 }
 
@@ -1354,9 +1405,10 @@ fn hoist_pass(builder: &mut CfgBuilder) {
                                 continue;
                             }
                         }
-                        if let Some(then_dest) = then_exprs.get(val) {
+                        let canonical_val = canonicalize(val);
+                        if let Some(then_dest) = then_exprs.get(&canonical_val) {
                             to_hoist.push((
-                                val.clone(),
+                                canonical_val,
                                 *then_dest,
                                 *dest,
                                 bb.id,

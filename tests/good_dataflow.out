@@ -16,3 +16,21 @@ bb0: % preds = []
 
 
 STDERR:
+warning: unused value
+  ┌─ tests/good_dataflow.c:6:11
+  │
+6 │         x=1;
+  │           ^ this value is computed but never used
+
+warning: unused value
+  ┌─ tests/good_dataflow.c:9:15
+  │
+9 │             x=2;
+  │               ^ this value is computed but never used
+
+warning: unused value
+   ┌─ tests/good_dataflow.c:15:11
+   │
+15 │         y=0;
+   │           ^ this value is computed but never used
+

@@ -1,0 +1,99 @@
+STDOUT:
+CFG Debug Dump Before Hoist Pass
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = lt %0, %1
+  br_cond %10 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  %13 = mul %0, %1
+  br bb3
+
+
+bb2: % preds = [bb0]
+  %17 = add %0, %1
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %30 = Φ(%13@bb1, %4@bb2) [var x]
+  %31 = Φ(%7@bb1, %17@bb2) [var y]
+  %21 = add %30, %31
+  return %21
+
+
+
+CFG Debug Dump After Hoist Pass
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = lt %0, %1
+  br_cond %10 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb3
+
+
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %30 = Φ(%7@bb1, %4@bb2) [var x]
+  %31 = Φ(%7@bb1, %4@bb2) [var y]
+  %21 = add %30, %31
+  return %21
+
+
+
+CFG Graphviz Before and After After Hoist Pass:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = lt %0, %1\n  br_cond %10 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  %13 = mul %0, %1\n  br bb3\n"];
+    before_bb1 -> before_bb3;
+    before_bb2 [label="bb2:\n  %17 = add %0, %1\n  br bb3\n"];
+    before_bb2 -> before_bb3;
+    before_bb3 [label="bb3:\n  %30 = Φ(%13@bb1, %4@bb2) [var x]\n  %31 = Φ(%7@bb1, %17@bb2) [var y]\n  %21 = add %30, %31\n  return %21\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = lt %0, %1\n  br_cond %10 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  br bb3\n"];
+    after_bb1 -> after_bb3;
+    after_bb2 [label="bb2:\n  br bb3\n"];
+    after_bb2 -> after_bb3;
+    after_bb3 [label="bb3:\n  %30 = Φ(%7@bb1, %4@bb2) [var x]\n  %31 = Φ(%7@bb1, %4@bb2) [var y]\n  %21 = add %30, %31\n  return %21\n"];
+  }
+
+}
+
+CFG for function f:
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = lt %0, %1
+  %34 = select %10, %7, %4 [var x]
+  %35 = select %10, %7, %4 [var y]
+  %21 = add %34, %35
+  return %21
+
+
+
+STDERR:
