@@ -303,7 +303,13 @@ impl Display for ValueRef {
     }
 }
 
-pub(super) fn debug_graphviz(output: &mut String, bb: &BasicBlock, sema: &SemaResults) {
+pub(super) fn debug_graphviz(
+    output: &mut String,
+    bb: &BasicBlock,
+    sema: &SemaResults,
+    block_prefix: &str,
+    indent: usize,
+) {
     let label = {
         let mut s = String::new();
         writeln!(&mut s, "{}:", bb.id).unwrap();
@@ -374,20 +380,40 @@ pub(super) fn debug_graphviz(output: &mut String, bb: &BasicBlock, sema: &SemaRe
     //     )
     //     .unwrap();
     // } else {
-    writeln!(output, "  {} [label={:?}];", bb.id, label).unwrap();
+    writeln!(
+        output,
+        "{:indent$}  {block_prefix}{} [label={label:?}];",
+        "", bb.id
+    )
+    .unwrap();
     // }
 
     match &bb.tail {
         TailCfgInstruction::UncondBranch { target } => {
-            writeln!(output, "  {} -> {};", bb.id, target).unwrap();
+            writeln!(
+                output,
+                "{:indent$}  {block_prefix}{} -> {block_prefix}{};",
+                "", bb.id, target
+            )
+            .unwrap();
         }
 
         //Color true transitions green, false red
         TailCfgInstruction::CondBranch {
             then_bb, else_bb, ..
         } => {
-            writeln!(output, "  {} -> {} [color=green];", bb.id, then_bb).unwrap();
-            writeln!(output, "  {} -> {} [color=red];", bb.id, else_bb).unwrap();
+            writeln!(
+                output,
+                "{:indent$}  {block_prefix}{} -> {block_prefix}{} [color=green];",
+                "", bb.id, then_bb
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{:indent$}  {block_prefix}{} -> {block_prefix}{} [color=red];",
+                "", bb.id, else_bb
+            )
+            .unwrap();
         }
         TailCfgInstruction::Return { .. } | TailCfgInstruction::Undefined => {}
     }
@@ -403,8 +429,19 @@ pub fn graphviz(cfg: &ControlFlowGraph, sema: &SemaResults) -> String {
     output.push_str(GRAPHVIZ_HEADER);
 
     for bb in &cfg.basic_blocks {
-        debug_graphviz(&mut output, bb, sema);
+        debug_graphviz(&mut output, bb, sema, "", 0);
     }
     output.push_str("}\n");
+    output
+}
+
+pub fn make_graphviz_subgraph(name: &str, cfg: &ControlFlowGraph, sema: &SemaResults) -> String {
+    let mut output = String::new();
+    writeln!(output, "subgraph cluster_{} {{", name).unwrap();
+
+    for bb in &cfg.basic_blocks {
+        debug_graphviz(&mut output, bb, sema, &format!("{}_", &name), 2);
+    }
+    writeln!(output, "}}").unwrap();
     output
 }

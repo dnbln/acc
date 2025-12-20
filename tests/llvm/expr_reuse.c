@@ -1,4 +1,4 @@
-//@ARGS: --cfg --llvm-ir --llvm-optimized-ir --opt-debug hp
+//@ARGS: --cfg --llvm-ir --llvm-optimized-ir --opt-debug hp,phi2sel,bd,bi
 int foo(int a, int b, int c){
     int x = 0;
     int y = 0;

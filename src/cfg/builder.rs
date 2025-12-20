@@ -229,9 +229,19 @@ impl CfgBuilder {
         output.push_str("digraph CFG {\n");
         output.push_str(display::GRAPHVIZ_HEADER);
         for bb in &self.blocks {
-            display::debug_graphviz(&mut output, bb, sema);
+            display::debug_graphviz(&mut output, bb, sema, "", 0);
         }
         output.push_str("}\n");
+        output
+    }
+
+    pub(super) fn make_graphviz_subgraph(&self, sema: &SemaResults, name: &str) -> String {
+        let mut output = String::new();
+        writeln!(output, "  subgraph cluster_{} {{", name).unwrap();
+        for bb in &self.blocks {
+            display::debug_graphviz(&mut output, bb, sema, &format!("{}_", name), 2);
+        }
+        writeln!(output, "  }}").unwrap();
         output
     }
 
