@@ -20,15 +20,3 @@ bb0: % preds = []
 
 
 STDERR:
-warning: unused value
-  ┌─ tests/composite_assignments.c:5:13
-  │
-5 │         x = 10;
-  │             ^^ this value is computed but never used
-
-warning: unused value
-  ┌─ tests/composite_assignments.c:7:13
-  │
-7 │         x = 20;
-  │             ^^ this value is computed but never used
-

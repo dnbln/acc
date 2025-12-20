@@ -20,39 +20,3 @@ bb2: % preds = [bb0, bb1]
 
 
 STDERR:
-warning: unused value
-  ┌─ tests/expr_reuse.c:3:13
-  │
-3 │     int x = 0;
-  │             ^ this value is computed but never used
-
-warning: unused value
-  ┌─ tests/expr_reuse.c:4:13
-  │
-4 │     int y = 0;
-  │             ^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/expr_reuse.c:12:11
-   │
-12 │         b=2;
-   │           ^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/expr_reuse.c:14:8
-   │
-14 │     z= b+c;
-   │        ^^^ this value is computed but never used
-
-warning: unused value
-  ┌─ tests/expr_reuse.c:5:13
-  │
-5 │     int s = b+c;
-  │             ^^^ this value is computed but never used
-
-warning: unused value
-  ┌─ tests/expr_reuse.c:7:8
-  │
-7 │     if(a+b<0) {
-  │        ^^^^^ this value is computed but never used
-

@@ -624,39 +624,3 @@ note: Name resolution
 23 │   factorial(result);
    │             ^^^^^^ Ref at RefId(12)
 
-warning: unused value
-   ┌─ tests/valid.c:10:11
-   │
-10 │   int x = 0;
-   │           ^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/valid.c:13:11
-   │
-13 │   if (x < 10) {
-   │           ^^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/valid.c:13:7
-   │
-13 │   if (x < 10) {
-   │       ^^^^^^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/valid.c:14:14
-   │
-14 │     result = 2;
-   │              ^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/valid.c:16:14
-   │
-16 │     result = 3;
-   │              ^ this value is computed but never used
-
-warning: unused value
-   ┌─ tests/valid.c:19:16
-   │
-19 │   for (int i = 0; i < 10; i++) {
-   │                ^ this value is computed but never used
-

@@ -7,9 +7,3 @@ bb0: % preds = []
 
 
 STDERR:
-warning: unused value
-  ┌─ tests/breaking_control_flow_while.c:3:12
-  │
-3 │     while (1) {
-  │            ^ this value is computed but never used
-

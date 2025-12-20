@@ -297,14 +297,12 @@ bb4: % preds = [bb2]
 
 
 bb5: % preds = [bb3, bb4]
-  %44 = %10 [var z]
   br bb6
 
 
 bb6: % preds = [bb1, bb5]
   %45 = Φ(%64@bb1, %4@bb5) [var x]
   %46 = Φ(%7@bb1, %64@bb5) [var y]
-  %59 = %10 [var z]
   %31 = mul %45, %46
   %33 = add %31, %10
   return %33
@@ -341,14 +339,12 @@ bb4: % preds = [bb2]
 
 
 bb5: % preds = [bb3, bb4]
-  %44 = %10 [var z]
   br bb6
 
 
 bb6: % preds = [bb1, bb5]
   %45 = Φ(%64@bb1, %4@bb5) [var x]
   %46 = Φ(%7@bb1, %64@bb5) [var y]
-  %59 = %10 [var z]
   %31 = mul %45, %46
   %33 = add %31, %10
   return %33
@@ -373,9 +369,9 @@ digraph CFG {
     before_bb3 -> before_bb5;
     before_bb4 [label="bb4:\n  br bb5\n"];
     before_bb4 -> before_bb5;
-    before_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    before_bb5 [label="bb5:\n  br bb6\n"];
     before_bb5 -> before_bb6;
-    before_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
   subgraph cluster_after {
@@ -391,9 +387,9 @@ digraph CFG {
     after_bb3 -> after_bb5;
     after_bb4 [label="bb4:\n  br bb5\n"];
     after_bb4 -> after_bb5;
-    after_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    after_bb5 [label="bb5:\n  br bb6\n"];
     after_bb5 -> after_bb6;
-    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
 }
@@ -428,14 +424,12 @@ bb4: % preds = [bb2]
 
 
 bb5: % preds = [bb3, bb4]
-  %44 = %10 [var z]
   br bb6
 
 
 bb6: % preds = [bb1, bb5]
   %45 = Φ(%64@bb1, %4@bb5) [var x]
   %46 = Φ(%7@bb1, %64@bb5) [var y]
-  %59 = %10 [var z]
   %31 = mul %45, %46
   %33 = add %31, %10
   return %33
@@ -472,14 +466,12 @@ bb4: % preds = [bb2]
 
 
 bb5: % preds = [bb3, bb4]
-  %44 = %10 [var z]
   br bb6
 
 
 bb6: % preds = [bb1, bb5]
   %45 = Φ(%64@bb1, %4@bb5) [var x]
   %46 = Φ(%7@bb1, %64@bb5) [var y]
-  %59 = %10 [var z]
   %31 = mul %45, %46
   %33 = add %31, %10
   return %33
@@ -504,9 +496,9 @@ digraph CFG {
     before_bb3 -> before_bb5;
     before_bb4 [label="bb4:\n  br bb5\n"];
     before_bb4 -> before_bb5;
-    before_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    before_bb5 [label="bb5:\n  br bb6\n"];
     before_bb5 -> before_bb6;
-    before_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
   subgraph cluster_after {
@@ -522,9 +514,9 @@ digraph CFG {
     after_bb3 -> after_bb5;
     after_bb4 [label="bb4:\n  br bb5\n"];
     after_bb4 -> after_bb5;
-    after_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    after_bb5 [label="bb5:\n  br bb6\n"];
     after_bb5 -> after_bb6;
-    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
 }

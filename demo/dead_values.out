@@ -107,33 +107,3 @@ bb3: % preds = [bb1, bb2]
 
 
 STDERR:
-warning: unused value
-  ┌─ demo/dead_values.c:6:13
-  │
-6 │     int z = a * b;
-  │             ^^^^^ this value is computed but never used
-
-warning: unused value
-  ┌─ demo/dead_values.c:7:13
-  │
-7 │     int w = a / b;
-  │             ^^^^^ this value is computed but never used
-
-warning: unused value
-  ┌─ demo/dead_values.c:5:13
-  │
-5 │     int y = a - b;
-  │             ^^^^^ this value is computed but never used
-
-warning: unused value
-   ┌─ demo/dead_values.c:12:17
-   │
-12 │         y = y - 1;
-   │                 ^ this value is computed but never used
-
-warning: unused value
-   ┌─ demo/dead_values.c:12:13
-   │
-12 │         y = y - 1;
-   │             ^^^^^ this value is computed but never used
-

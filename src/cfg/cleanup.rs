@@ -360,7 +360,7 @@ fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<
     live_values
 }
 
-fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) -> bool {
+fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool, emit_warnings: bool) -> bool {
     // Dead value elimination pass
     // ============================
     //
@@ -386,6 +386,12 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) -> bool {
                 }
             })
             .collect::<Vec<_>>();
+        changed |= !extracted.is_empty();
+
+        if !emit_warnings {
+            continue;
+        }
+
         for instr in &extracted {
             if CfgBuilder::is_optimized_phi(instr).is_some() {
                 // don't warn about phis and generally values tracking from one block to another
@@ -395,7 +401,6 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) -> bool {
                 builder.cfg_warnings.push(CfgWarning::UnusedValue(dest.1));
             }
         }
-        changed |= !extracted.is_empty();
     }
 
     changed
@@ -890,7 +895,7 @@ fn block_inliner(builder: &mut CfgBuilder) {
                     }
                 }
                 TailCfgInstruction::CondBranch {
-                    cond,
+                    cond: _,
                     then_bb,
                     else_bb,
                 } => {
@@ -911,6 +916,24 @@ fn block_inliner(builder: &mut CfgBuilder) {
                         && else_bb_ref.phi.is_empty()
                     {
                         to_inline = Some((bb.id, *then_bb));
+                        break;
+                    }
+
+                    // Inline in the following case:
+                    //
+                    //            A
+                    //           / \
+                    //          |   B
+                    //           \ /
+                    //            C
+                    if then_bb_ref.predecessors.eq_unordered(&[bb.id, *else_bb])
+                        && else_bb_ref.predecessors == [bb.id]
+                        && else_bb_ref.instructions.is_empty()
+                        && (else_bb_ref.tail
+                            == TailCfgInstruction::UncondBranch { target: *then_bb })
+                        && then_bb_ref.phi.is_empty()
+                    {
+                        to_inline = Some((bb.id, *else_bb));
                         break;
                     }
                 }
@@ -1545,7 +1568,7 @@ fn block_dedup(builder: &mut CfgBuilder) {
 fn tail_unification(builder: &mut CfgBuilder) {
     for bb in &mut builder.blocks {
         if let TailCfgInstruction::CondBranch {
-            cond,
+            cond: _,
             then_bb,
             else_bb,
         } = &bb.tail
@@ -1810,11 +1833,15 @@ pub enum OptPass {
 #[derive(Debug, Clone)]
 pub struct OptPassConfig {
     passes: Vec<OptPass>,
+    dve_emit_warnings: bool,
 }
 
 impl OptPassConfig {
-    pub fn new(passes: Vec<OptPass>) -> Self {
-        Self { passes }
+    pub fn new(passes: Vec<OptPass>, dve_emit_warnings: bool) -> Self {
+        Self {
+            passes,
+            dve_emit_warnings,
+        }
     }
 
     pub fn full() -> Self {
@@ -1832,6 +1859,7 @@ impl OptPassConfig {
                 OptPass::TrimDeadBlocks,
                 OptPass::BlockInliner,
             ],
+            dve_emit_warnings: false,
         }
     }
 
@@ -1903,11 +1931,11 @@ impl OptPassConfig {
     }
 }
 
-fn cp_dve_and_tdb_loop(builder: &mut CfgBuilder) {
+fn cp_dve_and_tdb_loop(builder: &mut CfgBuilder, dve_emit_warnings: bool) {
     loop {
         let mut changed = false;
         changed |= constant_propagation(builder);
-        changed |= dead_value_elimination(builder, true);
+        changed |= dead_value_elimination(builder, true, dve_emit_warnings);
         changed |= builder.trim_dead_blocks();
         if !changed {
             break;
@@ -1923,9 +1951,9 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder, sema: &SemaResults, confi
                 constant_propagation(builder);
             }
             OptPass::DeadValueElimination => {
-                dead_value_elimination(builder, true);
+                dead_value_elimination(builder, true, config.dve_emit_warnings);
             }
-            OptPass::CpDveAndTdbLoop => cp_dve_and_tdb_loop(builder),
+            OptPass::CpDveAndTdbLoop => cp_dve_and_tdb_loop(builder, config.dve_emit_warnings),
             OptPass::BlockInliner => block_inliner(builder),
             OptPass::HoistPass => hoist_pass(builder),
             OptPass::PhiSimplification => {

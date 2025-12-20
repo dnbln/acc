@@ -9,9 +9,3 @@ bb0: % preds = []
 
 
 STDERR:
-warning: unused value
-  ┌─ tests/reuse_1.c:4:9
-  │
-4 │     if (a < b) {
-  │         ^^^^^ this value is computed but never used
-

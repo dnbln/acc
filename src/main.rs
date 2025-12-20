@@ -35,6 +35,10 @@ struct Args {
     #[clap(long, value_enum, value_name = "OPT", value_delimiter = ',', num_args = 0..)]
     opt_debug: Vec<OptStageRef>,
 
+    /// Emit warnings from Dead Value Elimination pass
+    #[clap(long)]
+    dve_emit_warnings: bool,
+
     /// Generate Graphviz DOT files for CFGs after lowering, under directory DIR
     #[clap(long, value_name = "DIR")]
     cfg_graphviz: Option<PathBuf>,
@@ -206,8 +210,10 @@ enum OptMetaStageRef {
 }
 
 impl OptMetaStageRef {
-    fn build_pipeline(passes: &[OptMetaStageRef], debug: &[OptStageRef]) -> OptPassConfig {
-        let mut opt_config = OptPassConfig::new(vec![]);
+    fn build_pipeline(args: &Args) -> OptPassConfig {
+        let passes = &args.opt;
+        let debug = &args.opt_debug;
+        let mut opt_config = OptPassConfig::new(vec![], args.dve_emit_warnings);
         let mut wrap_with_debug = false;
         let mut wrap_with_debug_graphviz = false;
 
@@ -316,8 +322,8 @@ impl OptMetaStageRef {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let path = args.path;
-    let source = fs::read_to_string(&path).unwrap();
+    let path = &args.path;
+    let source = fs::read_to_string(path).unwrap();
 
     let program = match CParser::new(&source) {
         Ok(mut parser) => match parser.parse_program() {
@@ -377,7 +383,7 @@ fn main() -> Result<()> {
     let mut warnings = Vec::new();
 
     let mut program_cfgs = BTreeMap::<VarId, ControlFlowGraph>::new();
-    let opt_config = OptMetaStageRef::build_pipeline(&args.opt, &args.opt_debug);
+    let opt_config = OptMetaStageRef::build_pipeline(&args);
 
     for top_level in &program.items {
         match &**top_level {
