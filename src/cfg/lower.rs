@@ -1737,8 +1737,6 @@ impl MalformedPhiInfo {
 /// generate diagnostics later, as well as a graphviz representation of the malformed CFG, pointing
 /// out the missing sources for each malformed phi/assignment, as well as the missing variables on edges.
 fn malformed_phi_reduction(builder: &mut CfgBuilder, sema: &SemaResults) -> MalformedPhiInfo {
-    println!("{}", builder.debug_graphviz(sema));
-
     let mut infos = Vec::new();
     let mut phi_assignments = Vec::new();
     let mut removed_vals = BTreeSet::new();

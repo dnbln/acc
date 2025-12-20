@@ -12,19 +12,35 @@ bb0: % preds = []
 
 bb1: % preds = [bb0]
   %16 = sub %0, %1
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
+
+
+bb3: % preds = [bb2]
+  %23 = div %0, %1
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = Φ(%23@bb3, %10@bb4) [var z]
   %27 = sub %0, %1
-  br bb3
+  br bb6
 
 
-bb3: % preds = [bb1, bb2]
-  %44 = Φ(%16@bb1, %4@bb2) [var x]
-  %45 = Φ(%7@bb1, %27@bb2) [var y]
-  %31 = mul %44, %45
-  %33 = add %31, %10
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%16@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %27@bb5) [var y]
+  %59 = Φ(%10@bb1, %44@bb5) [var z]
+  %31 = mul %45, %46
+  %33 = add %31, %59
   return %33
 
 
@@ -42,19 +58,35 @@ bb0: % preds = []
 
 bb1: % preds = [bb0]
   %16 = sub %0, %1
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
+
+
+bb3: % preds = [bb2]
+  %23 = div %0, %1
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = Φ(%23@bb3, %10@bb4) [var z]
   %27 = sub %0, %1
-  br bb3
+  br bb6
 
 
-bb3: % preds = [bb1, bb2]
-  %44 = Φ(%16@bb1, %4@bb2) [var x]
-  %45 = Φ(%7@bb1, %27@bb2) [var y]
-  %31 = mul %44, %45
-  %33 = add %31, %10
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%16@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %27@bb5) [var y]
+  %59 = Φ(%10@bb1, %44@bb5) [var z]
+  %31 = mul %45, %46
+  %33 = add %31, %59
   return %33
 
 
@@ -68,22 +100,36 @@ digraph CFG {
     before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     before_bb0 -> before_bb1 [color=green];
     before_bb0 -> before_bb2 [color=red];
-    before_bb1 [label="bb1:\n  %16 = sub %0, %1\n  br bb3\n"];
-    before_bb1 -> before_bb3;
-    before_bb2 [label="bb2:\n  %27 = sub %0, %1\n  br bb3\n"];
-    before_bb2 -> before_bb3;
-    before_bb3 [label="bb3:\n  %44 = Φ(%16@bb1, %4@bb2) [var x]\n  %45 = Φ(%7@bb1, %27@bb2) [var y]\n  %31 = mul %44, %45\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb1 [label="bb1:\n  %16 = sub %0, %1\n  br bb6\n"];
+    before_bb1 -> before_bb6;
+    before_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    before_bb2 -> before_bb3 [color=green];
+    before_bb2 -> before_bb4 [color=red];
+    before_bb3 [label="bb3:\n  %23 = div %0, %1\n  br bb5\n"];
+    before_bb3 -> before_bb5;
+    before_bb4 [label="bb4:\n  br bb5\n"];
+    before_bb4 -> before_bb5;
+    before_bb5 [label="bb5:\n  %44 = Φ(%23@bb3, %10@bb4) [var z]\n  %27 = sub %0, %1\n  br bb6\n"];
+    before_bb5 -> before_bb6;
+    before_bb6 [label="bb6:\n  %45 = Φ(%16@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %27@bb5) [var y]\n  %59 = Φ(%10@bb1, %44@bb5) [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %59\n  return %33\n"];
   }
 
   subgraph cluster_after {
     after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     after_bb0 -> after_bb1 [color=green];
     after_bb0 -> after_bb2 [color=red];
-    after_bb1 [label="bb1:\n  %16 = sub %0, %1\n  br bb3\n"];
-    after_bb1 -> after_bb3;
-    after_bb2 [label="bb2:\n  %27 = sub %0, %1\n  br bb3\n"];
-    after_bb2 -> after_bb3;
-    after_bb3 [label="bb3:\n  %44 = Φ(%16@bb1, %4@bb2) [var x]\n  %45 = Φ(%7@bb1, %27@bb2) [var y]\n  %31 = mul %44, %45\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb1 [label="bb1:\n  %16 = sub %0, %1\n  br bb6\n"];
+    after_bb1 -> after_bb6;
+    after_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    after_bb2 -> after_bb3 [color=green];
+    after_bb2 -> after_bb4 [color=red];
+    after_bb3 [label="bb3:\n  %23 = div %0, %1\n  br bb5\n"];
+    after_bb3 -> after_bb5;
+    after_bb4 [label="bb4:\n  br bb5\n"];
+    after_bb4 -> after_bb5;
+    after_bb5 [label="bb5:\n  %44 = Φ(%23@bb3, %10@bb4) [var z]\n  %27 = sub %0, %1\n  br bb6\n"];
+    after_bb5 -> after_bb6;
+    after_bb6 [label="bb6:\n  %45 = Φ(%16@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %27@bb5) [var y]\n  %59 = Φ(%10@bb1, %44@bb5) [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %59\n  return %33\n"];
   }
 
 }
@@ -101,19 +147,35 @@ bb0: % preds = []
 
 bb1: % preds = [bb0]
   %16 = sub %0, %1
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
+
+
+bb3: % preds = [bb2]
+  %23 = div %0, %1
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = Φ(%23@bb3, %10@bb4) [var z]
   %27 = sub %0, %1
-  br bb3
+  br bb6
 
 
-bb3: % preds = [bb1, bb2]
-  %44 = Φ(%16@bb1, %4@bb2) [var x]
-  %45 = Φ(%7@bb1, %27@bb2) [var y]
-  %31 = mul %44, %45
-  %33 = add %31, %10
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%16@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %27@bb5) [var y]
+  %59 = Φ(%10@bb1, %44@bb5) [var z]
+  %31 = mul %45, %46
+  %33 = add %31, %59
   return %33
 
 
@@ -126,23 +188,38 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
+  %64 = sub %0, %1
   br_cond %13 ? bb1 : bb2
 
 
 bb1: % preds = [bb0]
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
-  br bb3
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
 
 
-bb3: % preds = [bb1, bb2]
-  %44 = Φ(%49@bb1, %4@bb2) [var x]
-  %45 = Φ(%7@bb1, %49@bb2) [var y]
-  %31 = mul %44, %45
-  %33 = add %31, %10
+bb3: % preds = [bb2]
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = Φ(%10@bb3, %10@bb4) [var z]
+  br bb6
+
+
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%64@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %64@bb5) [var y]
+  %59 = Φ(%10@bb1, %44@bb5) [var z]
+  %31 = mul %45, %46
+  %33 = add %31, %59
   return %33
 
 
@@ -156,22 +233,36 @@ digraph CFG {
     before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     before_bb0 -> before_bb1 [color=green];
     before_bb0 -> before_bb2 [color=red];
-    before_bb1 [label="bb1:\n  %16 = sub %0, %1\n  br bb3\n"];
-    before_bb1 -> before_bb3;
-    before_bb2 [label="bb2:\n  %27 = sub %0, %1\n  br bb3\n"];
-    before_bb2 -> before_bb3;
-    before_bb3 [label="bb3:\n  %44 = Φ(%16@bb1, %4@bb2) [var x]\n  %45 = Φ(%7@bb1, %27@bb2) [var y]\n  %31 = mul %44, %45\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb1 [label="bb1:\n  %16 = sub %0, %1\n  br bb6\n"];
+    before_bb1 -> before_bb6;
+    before_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    before_bb2 -> before_bb3 [color=green];
+    before_bb2 -> before_bb4 [color=red];
+    before_bb3 [label="bb3:\n  %23 = div %0, %1\n  br bb5\n"];
+    before_bb3 -> before_bb5;
+    before_bb4 [label="bb4:\n  br bb5\n"];
+    before_bb4 -> before_bb5;
+    before_bb5 [label="bb5:\n  %44 = Φ(%23@bb3, %10@bb4) [var z]\n  %27 = sub %0, %1\n  br bb6\n"];
+    before_bb5 -> before_bb6;
+    before_bb6 [label="bb6:\n  %45 = Φ(%16@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %27@bb5) [var y]\n  %59 = Φ(%10@bb1, %44@bb5) [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %59\n  return %33\n"];
   }
 
   subgraph cluster_after {
-    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     after_bb0 -> after_bb1 [color=green];
     after_bb0 -> after_bb2 [color=red];
-    after_bb1 [label="bb1:\n  br bb3\n"];
-    after_bb1 -> after_bb3;
-    after_bb2 [label="bb2:\n  br bb3\n"];
-    after_bb2 -> after_bb3;
-    after_bb3 [label="bb3:\n  %44 = Φ(%49@bb1, %4@bb2) [var x]\n  %45 = Φ(%7@bb1, %49@bb2) [var y]\n  %31 = mul %44, %45\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb1 [label="bb1:\n  br bb6\n"];
+    after_bb1 -> after_bb6;
+    after_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    after_bb2 -> after_bb3 [color=green];
+    after_bb2 -> after_bb4 [color=red];
+    after_bb3 [label="bb3:\n  br bb5\n"];
+    after_bb3 -> after_bb5;
+    after_bb4 [label="bb4:\n  br bb5\n"];
+    after_bb4 -> after_bb5;
+    after_bb5 [label="bb5:\n  %44 = Φ(%10@bb3, %10@bb4) [var z]\n  br bb6\n"];
+    after_bb5 -> after_bb6;
+    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = Φ(%10@bb1, %44@bb5) [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %59\n  return %33\n"];
   }
 
 }
@@ -184,22 +275,37 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
+  %64 = sub %0, %1
   br_cond %13 ? bb1 : bb2
 
 
 bb1: % preds = [bb0]
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
-  br bb3
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
 
 
-bb3: % preds = [bb1, bb2]
-  %44 = Φ(%49@bb1, %4@bb2) [var x]
-  %45 = Φ(%7@bb1, %49@bb2) [var y]
-  %31 = mul %44, %45
+bb3: % preds = [bb2]
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = %10 [var z]
+  br bb6
+
+
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%64@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %64@bb5) [var y]
+  %59 = %10 [var z]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -213,22 +319,37 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
-  %51 = select %13, %49, %4 [var x]
-  %52 = select %13, %7, %49 [var y]
+  %64 = sub %0, %1
   br_cond %13 ? bb1 : bb2
 
 
 bb1: % preds = [bb0]
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
-  br bb3
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
 
 
-bb3: % preds = [bb1, bb2]
-  %31 = mul %51, %52
+bb3: % preds = [bb2]
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = %10 [var z]
+  br bb6
+
+
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%64@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %64@bb5) [var y]
+  %59 = %10 [var z]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -240,25 +361,39 @@ digraph CFG {
   edge [fontname="Courier New", fontsize=9];
 
   subgraph cluster_before {
-    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     before_bb0 -> before_bb1 [color=green];
     before_bb0 -> before_bb2 [color=red];
-    before_bb1 [label="bb1:\n  br bb3\n"];
-    before_bb1 -> before_bb3;
-    before_bb2 [label="bb2:\n  br bb3\n"];
-    before_bb2 -> before_bb3;
-    before_bb3 [label="bb3:\n  %44 = Φ(%49@bb1, %4@bb2) [var x]\n  %45 = Φ(%7@bb1, %49@bb2) [var y]\n  %31 = mul %44, %45\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb1 [label="bb1:\n  br bb6\n"];
+    before_bb1 -> before_bb6;
+    before_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    before_bb2 -> before_bb3 [color=green];
+    before_bb2 -> before_bb4 [color=red];
+    before_bb3 [label="bb3:\n  br bb5\n"];
+    before_bb3 -> before_bb5;
+    before_bb4 [label="bb4:\n  br bb5\n"];
+    before_bb4 -> before_bb5;
+    before_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    before_bb5 -> before_bb6;
+    before_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
   subgraph cluster_after {
-    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  %51 = select %13, %49, %4 [var x]\n  %52 = select %13, %7, %49 [var y]\n  br_cond %13 ? bb1 : bb2\n"];
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     after_bb0 -> after_bb1 [color=green];
     after_bb0 -> after_bb2 [color=red];
-    after_bb1 [label="bb1:\n  br bb3\n"];
-    after_bb1 -> after_bb3;
-    after_bb2 [label="bb2:\n  br bb3\n"];
-    after_bb2 -> after_bb3;
-    after_bb3 [label="bb3:\n  %31 = mul %51, %52\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb1 [label="bb1:\n  br bb6\n"];
+    after_bb1 -> after_bb6;
+    after_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    after_bb2 -> after_bb3 [color=green];
+    after_bb2 -> after_bb4 [color=red];
+    after_bb3 [label="bb3:\n  br bb5\n"];
+    after_bb3 -> after_bb5;
+    after_bb4 [label="bb4:\n  br bb5\n"];
+    after_bb4 -> after_bb5;
+    after_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    after_bb5 -> after_bb6;
+    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
 }
@@ -271,22 +406,37 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
-  %51 = select %13, %49, %4 [var x]
-  %52 = select %13, %7, %49 [var y]
+  %64 = sub %0, %1
   br_cond %13 ? bb1 : bb2
 
 
 bb1: % preds = [bb0]
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
-  br bb3
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb4
 
 
-bb3: % preds = [bb1, bb2]
-  %31 = mul %51, %52
+bb3: % preds = [bb2]
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = %10 [var z]
+  br bb6
+
+
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%64@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %64@bb5) [var y]
+  %59 = %10 [var z]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -300,22 +450,37 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
-  %51 = select %13, %49, %4 [var x]
-  %52 = select %13, %7, %49 [var y]
-  br_cond %13 ? bb1 : bb1
+  %64 = sub %0, %1
+  br_cond %13 ? bb1 : bb2
 
 
 bb1: % preds = [bb0]
-  br bb3
+  br bb6
 
 
 bb2: % preds = [bb0]
-  br bb3
+  %20 = gt %0, %1
+  br_cond %20 ? bb3 : bb3
 
 
-bb3: % preds = [bb1, bb2]
-  %31 = mul %51, %52
+bb3: % preds = [bb2]
+  br bb5
+
+
+bb4: % preds = [bb2]
+  br bb5
+
+
+bb5: % preds = [bb3, bb4]
+  %44 = %10 [var z]
+  br bb6
+
+
+bb6: % preds = [bb1, bb5]
+  %45 = Φ(%64@bb1, %4@bb5) [var x]
+  %46 = Φ(%7@bb1, %64@bb5) [var y]
+  %59 = %10 [var z]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -327,25 +492,39 @@ digraph CFG {
   edge [fontname="Courier New", fontsize=9];
 
   subgraph cluster_before {
-    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  %51 = select %13, %49, %4 [var x]\n  %52 = select %13, %7, %49 [var y]\n  br_cond %13 ? bb1 : bb2\n"];
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     before_bb0 -> before_bb1 [color=green];
     before_bb0 -> before_bb2 [color=red];
-    before_bb1 [label="bb1:\n  br bb3\n"];
-    before_bb1 -> before_bb3;
-    before_bb2 [label="bb2:\n  br bb3\n"];
-    before_bb2 -> before_bb3;
-    before_bb3 [label="bb3:\n  %31 = mul %51, %52\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb1 [label="bb1:\n  br bb6\n"];
+    before_bb1 -> before_bb6;
+    before_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb4\n"];
+    before_bb2 -> before_bb3 [color=green];
+    before_bb2 -> before_bb4 [color=red];
+    before_bb3 [label="bb3:\n  br bb5\n"];
+    before_bb3 -> before_bb5;
+    before_bb4 [label="bb4:\n  br bb5\n"];
+    before_bb4 -> before_bb5;
+    before_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    before_bb5 -> before_bb6;
+    before_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
   subgraph cluster_after {
-    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  %51 = select %13, %49, %4 [var x]\n  %52 = select %13, %7, %49 [var y]\n  br_cond %13 ? bb1 : bb1\n"];
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
     after_bb0 -> after_bb1 [color=green];
-    after_bb0 -> after_bb1 [color=red];
-    after_bb1 [label="bb1:\n  br bb3\n"];
-    after_bb1 -> after_bb3;
-    after_bb2 [label="bb2:\n  br bb3\n"];
-    after_bb2 -> after_bb3;
-    after_bb3 [label="bb3:\n  %31 = mul %51, %52\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  br bb6\n"];
+    after_bb1 -> after_bb6;
+    after_bb2 [label="bb2:\n  %20 = gt %0, %1\n  br_cond %20 ? bb3 : bb3\n"];
+    after_bb2 -> after_bb3 [color=green];
+    after_bb2 -> after_bb3 [color=red];
+    after_bb3 [label="bb3:\n  br bb5\n"];
+    after_bb3 -> after_bb5;
+    after_bb4 [label="bb4:\n  br bb5\n"];
+    after_bb4 -> after_bb5;
+    after_bb5 [label="bb5:\n  %44 = %10 [var z]\n  br bb6\n"];
+    after_bb5 -> after_bb6;
+    after_bb6 [label="bb6:\n  %45 = Φ(%64@bb1, %4@bb5) [var x]\n  %46 = Φ(%7@bb1, %64@bb5) [var y]\n  %59 = %10 [var z]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
 }
@@ -358,18 +537,30 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
-  %51 = select %13, %49, %4 [var x]
-  %52 = select %13, %7, %49 [var y]
-  br bb1
+  %64 = sub %0, %1
+  br_cond %13 ? bb1 : bb2
 
 
 bb1: % preds = [bb0]
-  br bb2
+  br bb5
 
 
-bb2: % preds = [bb1]
-  %31 = mul %51, %52
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb2]
+  br bb4
+
+
+bb4: % preds = [bb3]
+  br bb5
+
+
+bb5: % preds = [bb1, bb4]
+  %45 = Φ(%64@bb1, %4@bb4) [var x]
+  %46 = Φ(%7@bb1, %64@bb4) [var y]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -383,10 +574,22 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
-  %51 = select %13, %49, %4 [var x]
-  %52 = select %13, %7, %49 [var y]
-  %31 = mul %51, %52
+  %64 = sub %0, %1
+  br_cond %13 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb3
+
+
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %45 = Φ(%64@bb1, %4@bb2) [var x]
+  %46 = Φ(%7@bb1, %64@bb2) [var y]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -398,15 +601,29 @@ digraph CFG {
   edge [fontname="Courier New", fontsize=9];
 
   subgraph cluster_before {
-    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  %51 = select %13, %49, %4 [var x]\n  %52 = select %13, %7, %49 [var y]\n  br bb1\n"];
-    before_bb0 -> before_bb1;
-    before_bb1 [label="bb1:\n  br bb2\n"];
-    before_bb1 -> before_bb2;
-    before_bb2 [label="bb2:\n  %31 = mul %51, %52\n  %33 = add %31, %10\n  return %33\n"];
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  br bb5\n"];
+    before_bb1 -> before_bb5;
+    before_bb2 [label="bb2:\n  br bb3\n"];
+    before_bb2 -> before_bb3;
+    before_bb3 [label="bb3:\n  br bb4\n"];
+    before_bb3 -> before_bb4;
+    before_bb4 [label="bb4:\n  br bb5\n"];
+    before_bb4 -> before_bb5;
+    before_bb5 [label="bb5:\n  %45 = Φ(%64@bb1, %4@bb4) [var x]\n  %46 = Φ(%7@bb1, %64@bb4) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
   subgraph cluster_after {
-    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %49 = sub %0, %1\n  %51 = select %13, %49, %4 [var x]\n  %52 = select %13, %7, %49 [var y]\n  %31 = mul %51, %52\n  %33 = add %31, %10\n  return %33\n"];
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  br bb3\n"];
+    after_bb1 -> after_bb3;
+    after_bb2 [label="bb2:\n  br bb3\n"];
+    after_bb2 -> after_bb3;
+    after_bb3 [label="bb3:\n  %45 = Φ(%64@bb1, %4@bb2) [var x]\n  %46 = Φ(%7@bb1, %64@bb2) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
   }
 
 }
@@ -419,10 +636,19 @@ bb0: % preds = []
   %7 = mul %0, %1
   %10 = div %0, %1
   %13 = lt %0, %1
-  %49 = sub %0, %1
-  %51 = select %13, %49, %4 [var x]
-  %52 = select %13, %7, %49 [var y]
-  %31 = mul %51, %52
+  %64 = sub %0, %1
+  br_cond %13 ? bb1 : bb2
+
+bb1: % preds = [bb0]
+  br bb3
+
+bb2: % preds = [bb0]
+  br bb3
+
+bb3: % preds = [bb1, bb2]
+  %45 = Φ(%64@bb1, %4@bb2) [var x]
+  %46 = Φ(%7@bb1, %64@bb2) [var y]
+  %31 = mul %45, %46
   %33 = add %31, %10
   return %33
 
@@ -438,9 +664,18 @@ bb0:
   %idiv = sdiv i64 %0, %1
   %cmp = icmp slt i64 %0, %1
   %sub = sub i64 %0, %1
-  %select = select i1 %cmp, i64 %sub, i64 %add
-  %select1 = select i1 %cmp, i64 %mul, i64 %sub
-  %mul2 = mul i64 %select, %select1
+  br i1 %cmp, label %bb1, label %bb2
+
+bb1:                                              ; preds = %bb0
+  br label %bb3
+
+bb2:                                              ; preds = %bb0
+  br label %bb3
+
+bb3:                                              ; preds = %bb2, %bb1
+  %phi = phi i64 [ %sub, %bb1 ], [ %add, %bb2 ]
+  %phi1 = phi i64 [ %mul, %bb1 ], [ %sub, %bb2 ]
+  %mul2 = mul i64 %phi, %phi1
   %add3 = add i64 %mul2, %idiv
   ret i64 %add3
 }
@@ -457,9 +692,9 @@ bb0:
   %idiv = sdiv i64 %0, %1
   %cmp = icmp slt i64 %0, %1
   %sub = sub i64 %0, %1
-  %select = select i1 %cmp, i64 %sub, i64 %add
-  %select1 = select i1 %cmp, i64 %mul, i64 %sub
-  %mul2 = mul i64 %select, %select1
+  %sub.add = select i1 %cmp, i64 %sub, i64 %add
+  %mul.sub = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %sub.add, %mul.sub
   %add3 = add i64 %idiv, %mul2
   ret i64 %add3
 }
