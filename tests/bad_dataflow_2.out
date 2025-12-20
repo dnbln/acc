@@ -14,6 +14,8 @@ error: Use before initialization detected during CFG lowering
 
 ---
 digraph MalformedPhiInfo {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
   BB0 [label="BB0:\n    %0 = var VarId(0) [malformed: missing from BBs []] (x)\n    return %0\n"];
 }
 

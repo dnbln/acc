@@ -47,7 +47,7 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use crate::{
     cfg::{
         builder::{CfgBuilder, ValidateError},
-        cleanup::cleanup_passes,
+        cleanup::{OptPassConfig, cleanup_passes},
         def::*,
         sema::SemaResults,
     },
@@ -96,6 +96,7 @@ pub enum LowerError {
 
 pub fn lower_ast_to_cfg(
     ast: &Function,
+    pass_config: &OptPassConfig,
     sema: &SemaResults,
     warnings: &mut Vec<CfgWarning>,
 ) -> Result<ControlFlowGraph, LowerError> {
@@ -158,7 +159,7 @@ pub fn lower_ast_to_cfg(
         return Err(LowerError::MalformedPhiInfo(malformed));
     }
 
-    cleanup_passes(&mut builder);
+    cleanup_passes(&mut builder, pass_config);
 
     match builder.build(entry) {
         Ok(cfg) => Ok(cfg),
@@ -1528,6 +1529,8 @@ impl MalformedPhiInfo {
     pub fn display_in_graphviz(&self, sema: &SemaResults) -> String {
         let mut output = String::new();
         output.push_str("digraph MalformedPhiInfo {\n");
+        output.push_str("  node [shape=box, fontname=\"Courier New\", fontsize=10];\n");
+        output.push_str("  edge [fontname=\"Courier New\", fontsize=9];\n");
 
         let mut edges_missing_vars: BTreeMap<(BBId, BBId), BTreeSet<VarId>> = BTreeMap::new();
 
@@ -1648,23 +1651,77 @@ impl MalformedPhiInfo {
             writeln!(&mut output, "  BB{} [label={s:?}];", block.id.0).unwrap();
         }
 
+        fn get_missing_vars_label(
+            edges_missing_vars: &BTreeMap<(BBId, BBId), BTreeSet<VarId>>,
+            from: BBId,
+            to: BBId,
+            sema: &SemaResults,
+        ) -> Option<String> {
+            if let Some(vars) = edges_missing_vars.get(&(from, to)) {
+                let var_names = vars
+                    .iter()
+                    .map(|v| sema.var_name(*v))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                Some(format!(
+                    "label=\"missing vars: {}\",fontcolor=red",
+                    var_names
+                ))
+            } else {
+                None
+            }
+        }
+
         for block in &self.blocks {
-            for succ in &block.successors {
-                if let Some(vars) = edges_missing_vars.get(&(block.id, *succ)) {
-                    let var_names = vars
-                        .iter()
-                        .map(|v| sema.var_name(*v))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    writeln!(
-                        &mut output,
-                        "  BB{} -> BB{} [label=\"missing vars: {}\",fontcolor=red];",
-                        block.id.0, succ.0, var_names
-                    )
-                    .unwrap();
-                } else {
-                    writeln!(&mut output, "  BB{} -> BB{};", block.id.0, succ.0).unwrap();
+            match &block.tail {
+                TailCfgInstruction::UncondBranch { target } => {
+                    let missing_vars_extra =
+                        get_missing_vars_label(&edges_missing_vars, block.id, *target, sema);
+                    if let Some(extra) = missing_vars_extra {
+                        writeln!(output, "  BB{} -> BB{} [{}];", block.id.0, target.0, extra)
+                            .unwrap();
+                    } else {
+                        writeln!(output, "  BB{} -> BB{};", block.id.0, target.0).unwrap();
+                    }
                 }
+
+                //Color true transitions green, false red
+                TailCfgInstruction::CondBranch {
+                    then_bb, else_bb, ..
+                } => {
+                    let missing_vars_then =
+                        get_missing_vars_label(&edges_missing_vars, block.id, *then_bb, sema);
+                    if let Some(extra) = missing_vars_then {
+                        writeln!(
+                            output,
+                            "  BB{} -> BB{} [color=green,{}];",
+                            block.id.0, then_bb.0, extra
+                        )
+                        .unwrap();
+                    } else {
+                        writeln!(
+                            output,
+                            "  BB{} -> BB{} [color=green];",
+                            block.id.0, then_bb.0
+                        )
+                        .unwrap();
+                    }
+                    let missing_vars_else =
+                        get_missing_vars_label(&edges_missing_vars, block.id, *else_bb, sema);
+                    if let Some(extra) = missing_vars_else {
+                        writeln!(
+                            output,
+                            "  BB{} -> BB{} [color=red,{}];",
+                            block.id.0, else_bb.0, extra
+                        )
+                        .unwrap();
+                    } else {
+                        writeln!(output, "  BB{} -> BB{} [color=red];", block.id.0, else_bb.0)
+                            .unwrap();
+                    }
+                }
+                TailCfgInstruction::Return { .. } | TailCfgInstruction::Undefined => {}
             }
         }
 

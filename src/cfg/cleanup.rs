@@ -1441,34 +1441,84 @@ fn phi_to_sel(builder: &mut CfgBuilder) {
     }
 }
 
-pub(super) fn cleanup_passes(builder: &mut CfgBuilder) {
-    loop {
-        let mut changed = false;
-        changed |= phi_simplification(builder);
-        changed |= val_inliner(builder);
-        if !changed {
-            break;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OptPass {
+    ConstantPropagation,
+    DeadValueElimination,
+    BlockInliner,
+    HoistPass,
+    PhiSimplification,
+    ValueInliner,
+    ValueInlinerPhiSimplificationLoop,
+    PhiToSelect,
+    BlockDedup,
+    TailUnification,
+    TrimDeadBlocks,
+}
+
+#[derive(Debug, Clone)]
+pub struct OptPassConfig {
+    passes: Vec<OptPass>,
+}
+
+impl OptPassConfig {
+    pub fn new(passes: Vec<OptPass>) -> Self {
+        Self { passes }
+    }
+
+    pub fn full() -> Self {
+        Self {
+            passes: vec![
+                OptPass::ValueInlinerPhiSimplificationLoop,
+                OptPass::ConstantPropagation,
+                OptPass::DeadValueElimination,
+                OptPass::BlockInliner,
+                OptPass::HoistPass,
+                OptPass::ValueInlinerPhiSimplificationLoop,
+                OptPass::PhiToSelect,
+                OptPass::BlockDedup,
+                OptPass::TailUnification,
+                OptPass::DeadValueElimination,
+                OptPass::TrimDeadBlocks,
+                OptPass::BlockInliner,
+            ],
         }
     }
 
-    constant_propagation(builder);
-    dead_value_elimination(builder, true);
-    block_inliner(builder);
-
-    hoist_pass(builder);
-    loop {
-        let mut changed = false;
-        changed |= phi_simplification(builder);
-        changed |= val_inliner(builder);
-        if !changed {
-            break;
-        }
+    pub fn join(&mut self, other: OptPassConfig) {
+        self.passes.extend(other.passes);
     }
 
-    phi_to_sel(builder);
-    block_dedup(builder);
-    tail_unification(builder);
-    dead_value_elimination(builder, true);
-    builder.trim_dead_blocks();
-    block_inliner(builder);
+    pub fn push_pass(&mut self, pass: OptPass) {
+        self.passes.push(pass);
+    }
+}
+
+pub(super) fn cleanup_passes(builder: &mut CfgBuilder, config: &OptPassConfig) {
+    for pass in &config.passes {
+        match pass {
+            OptPass::ConstantPropagation => constant_propagation(builder),
+            OptPass::DeadValueElimination => dead_value_elimination(builder, true),
+            OptPass::BlockInliner => block_inliner(builder),
+            OptPass::HoistPass => hoist_pass(builder),
+            OptPass::PhiSimplification => {
+                phi_simplification(builder);
+            }
+            OptPass::ValueInliner => {
+                val_inliner(builder);
+            }
+            OptPass::ValueInlinerPhiSimplificationLoop => loop {
+                let mut changed = false;
+                changed |= phi_simplification(builder);
+                changed |= val_inliner(builder);
+                if !changed {
+                    break;
+                }
+            },
+            OptPass::PhiToSelect => phi_to_sel(builder),
+            OptPass::BlockDedup => block_dedup(builder),
+            OptPass::TailUnification => tail_unification(builder),
+            OptPass::TrimDeadBlocks => builder.trim_dead_blocks(),
+        }
+    }
 }

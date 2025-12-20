@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use acc::cfg::def::ControlFlowGraph;
-use acc::cfg::lower::LowerError;
-use acc::cfg::sema;
+use acc::cfg::lower::{LowerError, lower_ast_to_cfg};
+use acc::cfg::{OptPass, OptPassConfig, sema};
 use acc::diagnostics::{IntoDiagnostic, show_diagnostics, show_diagnostics_with_sema};
 use acc::parser::ast::{RefId, VarId};
 use acc::parser::{Parser as CParser, TopLevel};
@@ -26,6 +26,9 @@ struct Args {
     /// Display the CFGs after lowering
     #[clap(long)]
     cfg: bool,
+
+    #[clap(long, value_enum, value_name = "OPT", value_delimiter = ',', num_args = 1.., default_value = "full")]
+    optimizations: Vec<OptStageRef>,
 
     /// Generate Graphviz DOT files for CFGs after lowering, under directory DIR
     #[clap(long, value_name = "DIR")]
@@ -80,6 +83,86 @@ fn display_cfg_errors(
             eprintln!("---\n{}", infos.display_in_graphviz(sema));
         }
         _ => {}
+    }
+}
+
+#[derive(Debug, clap::ValueEnum, Clone, Copy)]
+enum OptStageRef {
+    #[value(name = "none")]
+    None,
+    #[value(name = "full")]
+    Full,
+    #[value(name = "cp")]
+    ConstantPropagation,
+    #[value(name = "dve")]
+    DeadValueElimination,
+    #[value(name = "bi")]
+    BlockInliner,
+    #[value(name = "hp")]
+    HoistPass,
+    #[value(name = "ps")]
+    PhiSimplification,
+    #[value(name = "vi")]
+    ValueInliner,
+    #[value(name = "vips")]
+    ValueInlinerPhiSimplificationLoop,
+    #[value(name = "phi2sel")]
+    PhiToSelect,
+    #[value(name = "bd")]
+    BlockDedup,
+    #[value(name = "tu")]
+    TailUnification,
+    #[value(name = "tdb")]
+    TrimDeadBlocks,
+}
+
+impl OptStageRef {
+    fn build_pipeline(passes: &[OptStageRef]) -> OptPassConfig {
+        let mut opt_config = OptPassConfig::new(vec![]);
+
+        for pass in passes {
+            match pass {
+                OptStageRef::None => {}
+                OptStageRef::Full => {
+                    opt_config.join(OptPassConfig::full());
+                }
+                OptStageRef::ConstantPropagation => {
+                    opt_config.push_pass(OptPass::ConstantPropagation);
+                }
+                OptStageRef::DeadValueElimination => {
+                    opt_config.push_pass(OptPass::DeadValueElimination);
+                }
+                OptStageRef::BlockInliner => {
+                    opt_config.push_pass(OptPass::BlockInliner);
+                }
+                OptStageRef::HoistPass => {
+                    opt_config.push_pass(OptPass::HoistPass);
+                }
+                OptStageRef::PhiSimplification => {
+                    opt_config.push_pass(OptPass::PhiSimplification);
+                }
+                OptStageRef::ValueInliner => {
+                    opt_config.push_pass(OptPass::ValueInliner);
+                }
+                OptStageRef::ValueInlinerPhiSimplificationLoop => {
+                    opt_config.push_pass(OptPass::ValueInlinerPhiSimplificationLoop);
+                }
+                OptStageRef::PhiToSelect => {
+                    opt_config.push_pass(OptPass::PhiToSelect);
+                }
+                OptStageRef::BlockDedup => {
+                    opt_config.push_pass(OptPass::BlockDedup);
+                }
+                OptStageRef::TailUnification => {
+                    opt_config.push_pass(OptPass::TailUnification);
+                }
+                OptStageRef::TrimDeadBlocks => {
+                    opt_config.push_pass(OptPass::TrimDeadBlocks);
+                }
+            }
+        }
+
+        opt_config
     }
 }
 
@@ -146,11 +229,12 @@ fn main() -> Result<()> {
     let mut warnings = Vec::new();
 
     let mut program_cfgs = BTreeMap::<VarId, ControlFlowGraph>::new();
+    let opt_config = OptStageRef::build_pipeline(&args.optimizations);
 
     for top_level in &program.items {
         match &**top_level {
             TopLevel::Function(func, var_id) => {
-                let cfg = match acc::cfg::lower::lower_ast_to_cfg(func, &sema, &mut warnings) {
+                let cfg = match lower_ast_to_cfg(func, &opt_config, &sema, &mut warnings) {
                     Ok(cfg) => cfg,
                     Err(error) => {
                         eprintln!("CFG lowering error in function {}: {:?}", *func.name, error);

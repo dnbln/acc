@@ -1,0 +1,11 @@
+STDOUT:
+CFG for function foo:
+BBId(0): % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %21 = add %0, %1
+  return %21
+
+
+
+STDERR:

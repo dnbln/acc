@@ -344,11 +344,11 @@ pub fn graphviz(cfg: &ControlFlowGraph, sema: &SemaResults) -> String {
         if bb.id == cfg.entry { //make the first node (entry) in graph slightly filled
             writeln!(
                 output,
-                "  BB{} [label=\"{}\", style=filled, fillcolor=lightblue];",
+                "  BB{} [label={:?}, style=filled, fillcolor=lightblue];",
                 bb.id.0, label
             ).unwrap();
         } else {
-            writeln!(output, "  BB{} [label=\"{}\"];", bb.id.0, label).unwrap();
+            writeln!(output, "  BB{} [label={:?}];", bb.id.0, label).unwrap();
         }
 
         match &bb.tail {

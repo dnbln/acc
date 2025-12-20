@@ -37,6 +37,8 @@ error: Use before initialization detected during CFG lowering
 
 ---
 digraph MalformedPhiInfo {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
   BB0 [label="BB0:\n    %0 = param[0] (a)\n    %1 = param[1] (b)\n    %2 = %0 (a)\n    %3 = const.i64 0\n    %4 = lt %2, %3\n    br_cond %4 ? BB1 : BB2;\n"];
   BB1 [label="BB1:\n    %21 = %1 (b)\n    %20 = %0 (a)\n    %5 = const.i64 1\n    %6 = %5 (x)\n    br BB3\n"];
   BB2 [label="BB2:\n    %23 = %1 (b)\n    %22 = %0 (a)\n    br BB3\n"];
@@ -44,12 +46,12 @@ digraph MalformedPhiInfo {
   BB4 [label="BB4:\n    %31 = %27 (b)\n    %30 = %26 (a)\n    %28 = %24 [malformed: missing from BBs [3]] (x)\n    %15 = %28 [malformed: missing from BBs []] (x)\n    %16 = %15 [malformed: missing from BBs []] (y)\n    br BB6\n"];
   BB5 [label="BB5:\n    %33 = %27 (b)\n    %32 = %26 (a)\n    %29 = %24 [malformed: missing from BBs [3]] (x)\n    %17 = const.i64 0\n    %18 = %17 (y)\n    br BB6\n"];
   BB6 [label="BB6:\n    %25 = Φ(%16@BB4, %18@BB5 [malformed: missing from BBs [4]]) (y)\n    %34 = Φ(%28@BB4, %29@BB5 [malformed: missing from BBs [4, 5]]) (x)\n    %35 = Φ(%30@BB4, %32@BB5) (a)\n    %36 = Φ(%31@BB4, %33@BB5) (b)\n    %19 = %25 [malformed: missing from BBs []] (y)\n    return %19\n"];
-  BB0 -> BB1;
-  BB0 -> BB2;
+  BB0 -> BB1 [color=green];
+  BB0 -> BB2 [color=red];
   BB1 -> BB3;
   BB2 -> BB3 [label="missing vars: x",fontcolor=red];
-  BB3 -> BB4 [label="missing vars: x",fontcolor=red];
-  BB3 -> BB5 [label="missing vars: x",fontcolor=red];
+  BB3 -> BB4 [color=green,label="missing vars: x",fontcolor=red];
+  BB3 -> BB5 [color=red,label="missing vars: x",fontcolor=red];
   BB4 -> BB6 [label="missing vars: x, y",fontcolor=red];
   BB5 -> BB6 [label="missing vars: x",fontcolor=red];
 }

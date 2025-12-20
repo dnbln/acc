@@ -15,12 +15,14 @@ error: Use before initialization detected during CFG lowering
 
 ---
 digraph MalformedPhiInfo {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
   BB0 [label="BB0:\n    %0 = const.i64 1\n    br_cond %0 ? BB1 : BB2;\n"];
   BB1 [label="BB1:\n    %1 = const.i64 5\n    %2 = %1 (x)\n    br BB3\n"];
   BB2 [label="BB2:\n    br BB3\n"];
   BB3 [label="BB3:\n    %4 = Φ(%2@BB1 [malformed: missing from BBs [2]]) (x)\n    %3 = %4 [malformed: missing from BBs []] (x)\n    return %3\n"];
-  BB0 -> BB1;
-  BB0 -> BB2;
+  BB0 -> BB1 [color=green];
+  BB0 -> BB2 [color=red];
   BB1 -> BB3;
   BB2 -> BB3 [label="missing vars: x",fontcolor=red];
 }
