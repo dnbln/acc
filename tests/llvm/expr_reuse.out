@@ -1,5 +1,5 @@
 STDOUT:
-CFG Debug Dump before HoistPass
+CFG Debug Dump Before Hoist Pass
 BBId(0): % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
@@ -20,24 +20,16 @@ BBId(1): % preds = [BBId(0)]
 
 
 BBId(2): % preds = [BBId(0), BBId(1)]
-  %44 = Φ(0@BB0, %22@BB1) [var y]
-  return %44
+  %47 = Φ(%1@BB0, 2@BB1) [var b]
+  %48 = Φ(0@BB0, %22@BB1) [var y]
+  %28 = add %47, %2
+  %32 = add %7, %48
+  %34 = add %32, %28
+  return %34
 
 
 
-CFG Graphviz Dump before HoistPass
-digraph CFG {
-  node [shape=box, fontname="Courier New", fontsize=10];
-  edge [fontname="Courier New", fontsize=9];
-  BB0 [label="BB0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  %17 = add %0, %1\n  %18 = const.i64 0\n  %19 = gt %17, %18\n  br_cond %19 ? BB1 : BB2\n"];
-  BB0 -> BB1 [color=green];
-  BB0 -> BB2 [color=red];
-  BB1 [label="BB1:\n  %22 = add %1, %2\n  br BB2\n"];
-  BB1 -> BB2;
-  BB2 [label="BB2:\n  %44 = Φ(0@BB0, %22@BB1) [var \"y\"]\n  return %44\n"];
-}
-
-CFG Debug Dump after HoistPass
+CFG Debug Dump After Hoist Pass
 BBId(0): % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
@@ -55,22 +47,14 @@ BBId(1): % preds = [BBId(0)]
 
 
 BBId(2): % preds = [BBId(0), BBId(1)]
-  %44 = Φ(0@BB0, %7@BB1) [var y]
-  return %44
+  %47 = Φ(%1@BB0, 2@BB1) [var b]
+  %48 = Φ(0@BB0, %7@BB1) [var y]
+  %28 = add %47, %2
+  %32 = add %7, %48
+  %34 = add %32, %28
+  return %34
 
 
-
-CFG Graphviz Dump after HoistPass
-digraph CFG {
-  node [shape=box, fontname="Courier New", fontsize=10];
-  edge [fontname="Courier New", fontsize=9];
-  BB0 [label="BB0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  %19 = gt %10, %11\n  br_cond %19 ? BB1 : BB2\n"];
-  BB0 -> BB1 [color=green];
-  BB0 -> BB2 [color=red];
-  BB1 [label="BB1:\n  br BB2\n"];
-  BB1 -> BB2;
-  BB2 [label="BB2:\n  %44 = Φ(0@BB0, %7@BB1) [var \"y\"]\n  return %44\n"];
-}
 
 CFG for function foo:
 BBId(0): % preds = []
@@ -81,9 +65,14 @@ BBId(0): % preds = []
   %10 = add %0, %1
   %11 = const.i64 0
   %19 = gt %10, %11
-  %56 = const.i64 0 [var y]
-  %55 = select %19, %7, %56 [var y]
-  return %55
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
 
 
 Generated LLVM IR:
@@ -95,8 +84,12 @@ bb0:
   %add = add i64 %1, %2
   %add1 = add i64 %0, %1
   %cmp = icmp sgt i64 %add1, 0
-  %select = select i1 %cmp, i64 %add, i64 0
-  ret i64 %select
+  %select = select i1 %cmp, i64 2, i64 %1
+  %select2 = select i1 %cmp, i64 %add, i64 0
+  %add3 = add i64 %select, %2
+  %add4 = add i64 %add, %select2
+  %add5 = add i64 %add4, %add3
+  ret i64 %add5
 }
 
 Optimized LLVM IR:
@@ -109,8 +102,12 @@ bb0:
   %add = add i64 %2, %1
   %add1 = add i64 %1, %0
   %cmp = icmp sgt i64 %add1, 0
-  %select = select i1 %cmp, i64 %add, i64 0
-  ret i64 %select
+  %select = select i1 %cmp, i64 2, i64 %1
+  %select2 = select i1 %cmp, i64 %add, i64 0
+  %add3 = add i64 %add, %2
+  %add4 = add i64 %add3, %select2
+  %add5 = add i64 %add4, %select
+  ret i64 %add5
 }
 
 attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }

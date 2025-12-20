@@ -1,4 +1,4 @@
-//@ARGS: --cfg --llvm-ir --llvm-optimized-ir
+//@ARGS: --cfg --llvm-ir --llvm-optimized-ir --opt-debug hp
 int factorial(int n) {
   if (n <= 1) {
     return 1;

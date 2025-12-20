@@ -1,4 +1,4 @@
-//@ARGS: --cfg --llvm-ir --llvm-optimized-ir
+//@ARGS: --cfg --llvm-ir --llvm-optimized-ir --opt-debug hp
 int f(int a, int b) {
     int x = a + b;
     int y = a * b;

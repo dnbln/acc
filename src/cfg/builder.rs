@@ -262,15 +262,17 @@ impl CfgBuilder {
             .collect()
     }
 
-    pub(super) fn trim_dead_blocks(&mut self) {
+    pub(super) fn trim_dead_blocks(&mut self) -> bool {
         let dead_blocks = self.dead_blocks();
         if dead_blocks.is_empty() {
-            return;
+            return false;
         }
 
         self.blocks.retain(|bb| !dead_blocks.contains(&bb.id));
 
         self.relink_blocks();
+
+        true
     }
 
     fn relink_blocks(&mut self) {
@@ -341,6 +343,22 @@ impl CfgBuilder {
         assert_ne!(from_bb, to_bb, "Cannot inline a block into itself");
         let t = self.blocks.remove(to_bb.0);
         let f = self.block_by_id_mut(from_bb);
+        for phi in &t.phi {
+            assert_eq!(phi.sources.len(), 1);
+            assert_eq!(
+                phi.sources.contains_key(&from_bb),
+                true,
+                "Phi source for inlined block edge not found"
+            );
+            f.instructions.push(CfgInstruction::Assign {
+                dest: phi.dest,
+                val: RValue::from_value_ref_or_const(
+                    phi.sources
+                        .get(&from_bb)
+                        .expect("Source for inlined block edge not found"),
+                ),
+            });
+        }
         f.instructions.extend(t.instructions);
         f.tail = t.tail;
 

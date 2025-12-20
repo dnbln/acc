@@ -487,18 +487,13 @@ BBId(2): % preds = [BBId(0)]
 
 CFG for function main:
 BBId(0): % preds = []
-  %0 = const.i64 0
-  %2 = const.i64 10
-  %3 = lt %0, %2
-  %39 = const.i64 2 [var result]
-  %40 = const.i64 3 [var result]
-  %38 = select %3, %39, %40 [var result]
   br BBId(1)
 
 BBId(1): % preds = [BBId(0), BBId(2)]
   %25 = Φ(0@BB0, %17@BB2) [var i]
-  %28 = Φ(%38@BB0, %13@BB2) [var result]
-  %11 = lt %25, %2
+  %28 = Φ(2@BB0, %13@BB2) [var result]
+  %10 = const.i64 10
+  %11 = lt %25, %10
   br_cond %11 ? BBId(2) : BBId(3)
 
 BBId(2): % preds = [BBId(1)]
@@ -510,7 +505,8 @@ BBId(2): % preds = [BBId(1)]
 BBId(3): % preds = [BBId(1)]
   %18 = function v1 [var factorial]
   %20 = call %18(%28)
-  return %0
+  %21 = const.i64 0
+  return %21
 
 
 

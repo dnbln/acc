@@ -355,7 +355,7 @@ fn live_values_analysis(builder: &mut CfgBuilder, mark_calls: bool) -> BTreeSet<
     live_values
 }
 
-fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
+fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) -> bool {
     // Dead value elimination pass
     // ============================
     //
@@ -363,8 +363,13 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
     // We use the live values analysis to determine which values are live.
     let live_values = live_values_analysis(builder, mark_calls);
 
+    let mut changed = false;
+
     for bb in &mut builder.blocks {
+        let old_phi_count = bb.phi.len();
         bb.phi.retain(|phi| live_values.contains(&phi.dest));
+        changed |= old_phi_count != bb.phi.len();
+        let old_instr_count = bb.instructions.len();
         bb.instructions.retain(|instr| {
             if let CfgInstruction::Assign { dest, val: _ } = instr
                 && !live_values.contains(dest)
@@ -374,7 +379,10 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
                 true
             }
         });
+        changed |= old_instr_count != bb.instructions.len();
     }
+
+    changed
 }
 
 /// Constant propagation pass
@@ -384,8 +392,11 @@ fn dead_value_elimination(builder: &mut CfgBuilder, mark_calls: bool) {
 ///
 /// For example, if we have %a = 5, %b = 3, and %c = %a + %b we can replace %c with 8.
 /// This enables further optimizations like dead value elimination.
-fn constant_propagation(builder: &mut CfgBuilder) {
+fn constant_propagation(builder: &mut CfgBuilder) -> bool {
     let mut constants = BTreeMap::<ValueRef, i64>::new();
+    let mut constant_bools = BTreeMap::<ValueRef, bool>::new();
+
+    let mut top_changed = false;
 
     loop {
         let mut changed = false;
@@ -413,6 +424,25 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                                     changed = true;
                                 }
                             }
+                        } else if let Some(c) = constant_bools.get(v) {
+                            if phi.sources.values().all(|v| match v {
+                                ValueRefOrConst::Value(v2) => {
+                                    if let Some(c2) = constant_bools.get(v2) {
+                                        c == c2
+                                    } else {
+                                        false
+                                    }
+                                }
+                                ValueRefOrConst::ConstBool(c2) => c == c2,
+                                ValueRefOrConst::Const(_) => false,
+                            }) {
+                                if !constant_bools.contains_key(&phi.dest)
+                                    || constant_bools[&phi.dest] != *c
+                                {
+                                    constant_bools.insert(phi.dest, *c);
+                                    changed = true;
+                                }
+                            }
                         }
                     }
                     ValueRefOrConst::Const(c) => {
@@ -431,7 +461,21 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                         }
                     }
                     ValueRefOrConst::ConstBool(c) => {
-                        // skip boolean constants for now
+                        if phi.sources.values().all(|v| match v {
+                            ValueRefOrConst::ConstBool(c2) => c == c2,
+                            ValueRefOrConst::Const(_) => false,
+                            ValueRefOrConst::Value(v2) => match constant_bools.get(v2) {
+                                Some(c2) => c == c2,
+                                None => false,
+                            },
+                        }) {
+                            if !constant_bools.contains_key(&phi.dest)
+                                || constant_bools[&phi.dest] != *c
+                            {
+                                constant_bools.insert(phi.dest, *c);
+                                changed = true;
+                            }
+                        }
                     }
                 }
             }
@@ -446,7 +490,10 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                             }
                         }
                         RValue::ConstBool(b) => {
-                            // skip boolean constants for now
+                            if !constant_bools.contains_key(dest) || constant_bools[dest] != *b {
+                                constant_bools.insert(*dest, *b);
+                                changed = true;
+                            }
                         }
                         RValue::Add { left, right } => {
                             if let (Some(lc), Some(rc)) =
@@ -507,7 +554,190 @@ fn constant_propagation(builder: &mut CfgBuilder) {
                                 }
                             }
                         }
-                        _ => {}
+                        RValue::EqCheck { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc == rc;
+                                if !constant_bools.contains_key(dest)
+                                    || constant_bools[dest] != result
+                                {
+                                    constant_bools.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::NEqCheck { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc != rc;
+                                if !constant_bools.contains_key(dest)
+                                    || constant_bools[dest] != result
+                                {
+                                    constant_bools.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::LtCheck { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc < rc;
+                                if !constant_bools.contains_key(dest)
+                                    || constant_bools[dest] != result
+                                {
+                                    constant_bools.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::GtCheck { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc > rc;
+                                if !constant_bools.contains_key(dest)
+                                    || constant_bools[dest] != result
+                                {
+                                    constant_bools.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::LEqCheck { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc <= rc;
+                                if !constant_bools.contains_key(dest)
+                                    || constant_bools[dest] != result
+                                {
+                                    constant_bools.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::GEqCheck { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc >= rc;
+                                if !constant_bools.contains_key(dest)
+                                    || constant_bools[dest] != result
+                                {
+                                    constant_bools.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::Param { .. } | RValue::Function { .. } => {}
+                        RValue::Value(value_ref) => {
+                            if let Some(c) = constants.get(value_ref) {
+                                if !constants.contains_key(dest) || constants[dest] != *c {
+                                    constants.insert(*dest, *c);
+                                    changed = true;
+                                }
+                            } else if let Some(c) = constant_bools.get(value_ref) {
+                                if !constant_bools.contains_key(dest) || constant_bools[dest] != *c
+                                {
+                                    constant_bools.insert(*dest, *c);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::_VarId(var_id) => {
+                            unreachable!()
+                        }
+                        RValue::BitwiseAnd { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc & rc;
+                                if !constants.contains_key(dest) || constants[dest] != result {
+                                    constants.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::BitwiseOr { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc | rc;
+                                if !constants.contains_key(dest) || constants[dest] != result {
+                                    constants.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::BitwiseXor { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc ^ rc;
+                                if !constants.contains_key(dest) || constants[dest] != result {
+                                    constants.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::BitShiftLeft { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc << rc;
+                                if !constants.contains_key(dest) || constants[dest] != result {
+                                    constants.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::BitShiftRight { left, right } => {
+                            if let (Some(lc), Some(rc)) =
+                                (constants.get(left), constants.get(right))
+                            {
+                                let result = lc >> rc;
+                                if !constants.contains_key(dest) || constants[dest] != result {
+                                    constants.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::BitwiseNot { expr } => {
+                            if let Some(c) = constants.get(expr) {
+                                let result = !c;
+                                if !constants.contains_key(dest) || constants[dest] != result {
+                                    constants.insert(*dest, result);
+                                    changed = true;
+                                }
+                            }
+                        }
+                        RValue::Call { func, args } => {}
+                        RValue::Select {
+                            cond,
+                            then_val,
+                            else_val,
+                        } => {
+                            if let Some(c) = constant_bools.get(cond) {
+                                if *c {
+                                    if let Some(tc) = constants.get(then_val) {
+                                        if !constants.contains_key(dest) || constants[dest] != *tc {
+                                            constants.insert(*dest, *tc);
+                                            changed = true;
+                                        }
+                                    }
+                                } else {
+                                    if let Some(ec) = constants.get(else_val) {
+                                        if !constants.contains_key(dest) || constants[dest] != *ec {
+                                            constants.insert(*dest, *ec);
+                                            changed = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -518,24 +748,87 @@ fn constant_propagation(builder: &mut CfgBuilder) {
         }
     }
 
+    let mut need_relink_blocks = false;
+
     for bb in &mut builder.blocks {
         for phi in &mut bb.phi {
             for s in phi.sources.values_mut() {
                 if let ValueRefOrConst::Value(v) = s {
                     if let Some(c) = constants.get(v) {
                         *s = ValueRefOrConst::Const(*c);
+                        top_changed = true;
+                    } else if let Some(c) = constant_bools.get(v) {
+                        *s = ValueRefOrConst::ConstBool(*c);
+                        top_changed = true;
                     }
                 }
             }
         }
         for instr in &mut bb.instructions {
             if let CfgInstruction::Assign { dest, val } = instr {
-                if let Some(c) = constants.get(dest) {
+                if let Some(c) = constants.get(dest)
+                    && *val != RValue::Const(*c)
+                {
                     *val = RValue::Const(*c);
+                    top_changed = true;
                 }
+                if let Some(c) = constant_bools.get(dest)
+                    && *val != RValue::ConstBool(*c)
+                {
+                    *val = RValue::ConstBool(*c);
+                    top_changed = true;
+                }
+
+                // if let RValue::Select {
+                //     cond,
+                //     then_val,
+                //     else_val,
+                // } = val
+                //     && let Some(c) = constant_bools.get(cond)
+                // {
+                //     if *c {
+                //         if constants.contains_key(then_val) {
+                //             *val = RValue::Const(constants[then_val]);
+                //         } else if constant_bools.contains_key(then_val) {
+                //             *val = RValue::ConstBool(constant_bools[then_val]);
+                //         } else {
+                //             *val = RValue::Value(*then_val);
+                //         }
+                //     } else {
+                //         if constants.contains_key(else_val) {
+                //             *val = RValue::Const(constants[else_val]);
+                //         } else if constant_bools.contains_key(else_val) {
+                //             *val = RValue::ConstBool(constant_bools[else_val]);
+                //         } else {
+                //             *val = RValue::Value(*else_val);
+                //         }
+                //     }
+                //     top_changed = true;
+                // }
             }
         }
+
+        if let TailCfgInstruction::CondBranch {
+            cond,
+            then_bb,
+            else_bb,
+        } = &mut bb.tail
+            && let Some(c) = constant_bools.get(cond)
+        {
+            if *c {
+                bb.tail = TailCfgInstruction::UncondBranch { target: *then_bb };
+            } else {
+                bb.tail = TailCfgInstruction::UncondBranch { target: *else_bb };
+            }
+            need_relink_blocks = true;
+            top_changed = true;
+        }
     }
+
+    if need_relink_blocks {
+        builder.link_successors_and_predecessors(&mut Vec::new());
+    }
+    top_changed
 }
 
 /// Block inlining pass
@@ -595,7 +888,6 @@ fn block_inliner(builder: &mut CfgBuilder) {
                     let then_bb_ref = &builder.blocks[then_bb.0];
                     let else_bb_ref = &builder.blocks[else_bb.0];
                     if then_bb_ref.predecessors == [bb.id]
-                        && else_bb_ref.predecessors.len() == 2
                         && else_bb_ref.predecessors.eq_unordered(&[bb.id, *then_bb])
                         && then_bb_ref.instructions.is_empty()
                         && (then_bb_ref.tail
@@ -1446,6 +1738,7 @@ fn phi_to_sel(builder: &mut CfgBuilder) {
 pub enum OptPass {
     ConstantPropagation,
     DeadValueElimination,
+    CpDveAndTdbLoop,
     BlockInliner,
     HoistPass,
     PhiSimplification,
@@ -1473,8 +1766,7 @@ impl OptPassConfig {
         Self {
             passes: vec![
                 OptPass::ValueInlinerPhiSimplificationLoop,
-                OptPass::ConstantPropagation,
-                OptPass::DeadValueElimination,
+                OptPass::CpDveAndTdbLoop,
                 OptPass::BlockInliner,
                 OptPass::HoistPass,
                 OptPass::ValueInlinerPhiSimplificationLoop,
@@ -1495,13 +1787,81 @@ impl OptPassConfig {
     pub fn push_pass(&mut self, pass: OptPass) {
         self.passes.push(pass);
     }
+
+    pub fn insert_debug_passes(&mut self, debug: &[OptPass]) {
+        for pass in std::mem::take(&mut self.passes) {
+            let d = debug.contains(&pass);
+            if d {
+                self.passes.push(OptPass::Debug {
+                    name: match pass {
+                        OptPass::ConstantPropagation => "Before Constant Propagation",
+                        OptPass::DeadValueElimination => "Before Dead Value Elimination",
+                        OptPass::CpDveAndTdbLoop => "Before CP,DVE and TDB Loop",
+                        OptPass::BlockInliner => "Before Block Inliner",
+                        OptPass::HoistPass => "Before Hoist Pass",
+                        OptPass::PhiSimplification => "Before Phi Simplification",
+                        OptPass::ValueInliner => "Before Value Inliner",
+                        OptPass::ValueInlinerPhiSimplificationLoop => {
+                            "Before Value Inliner Phi Simplification Loop"
+                        }
+                        OptPass::PhiToSelect => "Before Phi to Select",
+                        OptPass::BlockDedup => "Before Block Deduplication",
+                        OptPass::TailUnification => "Before Tail Unification",
+                        OptPass::TrimDeadBlocks => "Before Trim Dead Blocks",
+                        OptPass::Debug { name } => name,
+                        OptPass::DebugGraphviz { name } => name,
+                    },
+                });
+            }
+            self.passes.push(pass);
+            if d {
+                self.passes.push(OptPass::Debug {
+                    name: match pass {
+                        OptPass::ConstantPropagation => "After Constant Propagation",
+                        OptPass::DeadValueElimination => "After Dead Value Elimination",
+                        OptPass::CpDveAndTdbLoop => "After CP,DVE and TDB Loop",
+                        OptPass::BlockInliner => "After Block Inliner",
+                        OptPass::HoistPass => "After Hoist Pass",
+                        OptPass::PhiSimplification => "After Phi Simplification",
+                        OptPass::ValueInliner => "After Value Inliner",
+                        OptPass::ValueInlinerPhiSimplificationLoop => {
+                            "After Value Inliner Phi Simplification Loop"
+                        }
+                        OptPass::PhiToSelect => "After Phi to Select",
+                        OptPass::BlockDedup => "After Block Deduplication",
+                        OptPass::TailUnification => "After Tail Unification",
+                        OptPass::TrimDeadBlocks => "After Trim Dead Blocks",
+                        OptPass::Debug { name } => name,
+                        OptPass::DebugGraphviz { name } => name,
+                    },
+                });
+            }
+        }
+    }
+}
+
+fn cp_dve_and_tdb_loop(builder: &mut CfgBuilder) {
+    loop {
+        let mut changed = false;
+        changed |= constant_propagation(builder);
+        changed |= dead_value_elimination(builder, true);
+        changed |= builder.trim_dead_blocks();
+        if !changed {
+            break;
+        }
+    }
 }
 
 pub(super) fn cleanup_passes(builder: &mut CfgBuilder, sema: &SemaResults, config: &OptPassConfig) {
     for pass in &config.passes {
         match pass {
-            OptPass::ConstantPropagation => constant_propagation(builder),
-            OptPass::DeadValueElimination => dead_value_elimination(builder, true),
+            OptPass::ConstantPropagation => {
+                constant_propagation(builder);
+            }
+            OptPass::DeadValueElimination => {
+                dead_value_elimination(builder, true);
+            }
+            OptPass::CpDveAndTdbLoop => cp_dve_and_tdb_loop(builder),
             OptPass::BlockInliner => block_inliner(builder),
             OptPass::HoistPass => hoist_pass(builder),
             OptPass::PhiSimplification => {
@@ -1521,7 +1881,9 @@ pub(super) fn cleanup_passes(builder: &mut CfgBuilder, sema: &SemaResults, confi
             OptPass::PhiToSelect => phi_to_sel(builder),
             OptPass::BlockDedup => block_dedup(builder),
             OptPass::TailUnification => tail_unification(builder),
-            OptPass::TrimDeadBlocks => builder.trim_dead_blocks(),
+            OptPass::TrimDeadBlocks => {
+                builder.trim_dead_blocks();
+            }
             OptPass::Debug { name } => {
                 println!("CFG Debug Dump {name}");
                 builder.debug(sema);

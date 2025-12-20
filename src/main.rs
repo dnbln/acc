@@ -27,8 +27,15 @@ struct Args {
     #[clap(long)]
     cfg: bool,
 
+    /// Optimization passes to run, in order.
+    ///
+    /// full = vips,cp,dve,bi,hp,vips,phi2sel,bd,tu,dve,tdb,bi
     #[clap(long, value_enum, value_name = "OPT", value_delimiter = ',', num_args = 1.., default_value = "full")]
-    optimizations: Vec<OptStageRef>,
+    opt: Vec<OptMetaStageRef>,
+
+    /// Insert debug dumps before and after each mentioned optimization pass in the optimization pipeline.
+    #[clap(long, value_enum, value_name = "OPT", value_delimiter = ',', num_args = 0..)]
+    opt_debug: Vec<OptStageRef>,
 
     /// Generate Graphviz DOT files for CFGs after lowering, under directory DIR
     #[clap(long, value_name = "DIR")]
@@ -88,6 +95,57 @@ fn display_cfg_errors(
 
 #[derive(Debug, clap::ValueEnum, Clone, Copy)]
 enum OptStageRef {
+    #[value(name = "cp")]
+    ConstantPropagation,
+    #[value(name = "dve")]
+    DeadValueElimination,
+    #[value(name = "cpdvetdb")]
+    ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop,
+    #[value(name = "bi")]
+    BlockInliner,
+    #[value(name = "hp")]
+    HoistPass,
+    #[value(name = "ps")]
+    PhiSimplification,
+    #[value(name = "vi")]
+    ValueInliner,
+    #[value(name = "vips")]
+    ValueInlinerPhiSimplificationLoop,
+    #[value(name = "phi2sel")]
+    PhiToSelect,
+    #[value(name = "bd")]
+    BlockDedup,
+    #[value(name = "tu")]
+    TailUnification,
+    #[value(name = "tdb")]
+    TrimDeadBlocks,
+}
+
+impl From<OptStageRef> for OptPass {
+    fn from(stage: OptStageRef) -> Self {
+        match stage {
+            OptStageRef::ConstantPropagation => OptPass::ConstantPropagation,
+            OptStageRef::DeadValueElimination => OptPass::DeadValueElimination,
+            OptStageRef::ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop => {
+                OptPass::CpDveAndTdbLoop
+            }
+            OptStageRef::BlockInliner => OptPass::BlockInliner,
+            OptStageRef::HoistPass => OptPass::HoistPass,
+            OptStageRef::PhiSimplification => OptPass::PhiSimplification,
+            OptStageRef::ValueInliner => OptPass::ValueInliner,
+            OptStageRef::ValueInlinerPhiSimplificationLoop => {
+                OptPass::ValueInlinerPhiSimplificationLoop
+            }
+            OptStageRef::PhiToSelect => OptPass::PhiToSelect,
+            OptStageRef::BlockDedup => OptPass::BlockDedup,
+            OptStageRef::TailUnification => OptPass::TailUnification,
+            OptStageRef::TrimDeadBlocks => OptPass::TrimDeadBlocks,
+        }
+    }
+}
+
+#[derive(Debug, clap::ValueEnum, Clone, Copy)]
+enum OptMetaStageRef {
     #[value(name = "none")]
     None,
     #[value(name = "full")]
@@ -96,6 +154,8 @@ enum OptStageRef {
     ConstantPropagation,
     #[value(name = "dve")]
     DeadValueElimination,
+    #[value(name = "cpdvetdb")]
+    ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop,
     #[value(name = "bi")]
     BlockInliner,
     #[value(name = "hp")]
@@ -120,8 +180,8 @@ enum OptStageRef {
     DebugGraphviz,
 }
 
-impl OptStageRef {
-    fn build_pipeline(passes: &[OptStageRef]) -> OptPassConfig {
+impl OptMetaStageRef {
+    fn build_pipeline(passes: &[OptMetaStageRef], debug: &[OptStageRef]) -> OptPassConfig {
         let mut opt_config = OptPassConfig::new(vec![]);
         let mut wrap_with_debug = false;
         let mut wrap_with_debug_graphviz = false;
@@ -152,63 +212,78 @@ impl OptStageRef {
 
         for pass in passes {
             match pass {
-                OptStageRef::None => {}
-                OptStageRef::Full => {
+                OptMetaStageRef::None => {}
+                OptMetaStageRef::Full => {
                     wrap!("Full", opt_config.join(OptPassConfig::full()));
                 }
-                OptStageRef::ConstantPropagation => {
+                OptMetaStageRef::ConstantPropagation => {
                     wrap!(
                         "ConstantPropagation",
                         opt_config.push_pass(OptPass::ConstantPropagation)
                     );
                 }
-                OptStageRef::DeadValueElimination => {
+                OptMetaStageRef::DeadValueElimination => {
                     wrap!(
                         "DeadValueElimination",
                         opt_config.push_pass(OptPass::DeadValueElimination)
                     );
                 }
-                OptStageRef::BlockInliner => {
+                OptMetaStageRef::ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop => {
+                    wrap!(
+                        "ConstantPropagationDeadValueEliminationTrimDeadBlocksLoop",
+                        opt_config.push_pass(OptPass::CpDveAndTdbLoop)
+                    );
+                }
+                OptMetaStageRef::BlockInliner => {
                     wrap!("BlockInliner", opt_config.push_pass(OptPass::BlockInliner));
                 }
-                OptStageRef::HoistPass => {
+                OptMetaStageRef::HoistPass => {
                     wrap!("HoistPass", opt_config.push_pass(OptPass::HoistPass));
                 }
-                OptStageRef::PhiSimplification => {
+                OptMetaStageRef::PhiSimplification => {
                     wrap!(
                         "PhiSimplification",
                         opt_config.push_pass(OptPass::PhiSimplification)
                     );
                 }
-                OptStageRef::ValueInliner => {
+                OptMetaStageRef::ValueInliner => {
                     wrap!("ValueInliner", opt_config.push_pass(OptPass::ValueInliner));
                 }
-                OptStageRef::ValueInlinerPhiSimplificationLoop => {
+                OptMetaStageRef::ValueInlinerPhiSimplificationLoop => {
                     wrap!(
                         "ValueInlinerPhiSimplificationLoop",
                         opt_config.push_pass(OptPass::ValueInlinerPhiSimplificationLoop)
                     );
                 }
-                OptStageRef::PhiToSelect => {
+                OptMetaStageRef::PhiToSelect => {
                     wrap!("PhiToSelect", opt_config.push_pass(OptPass::PhiToSelect));
                 }
-                OptStageRef::BlockDedup => {
+                OptMetaStageRef::BlockDedup => {
                     wrap!("BlockDedup", opt_config.push_pass(OptPass::BlockDedup));
                 }
-                OptStageRef::TailUnification => {
-                    wrap!("TailUnification", opt_config.push_pass(OptPass::TailUnification));
+                OptMetaStageRef::TailUnification => {
+                    wrap!(
+                        "TailUnification",
+                        opt_config.push_pass(OptPass::TailUnification)
+                    );
                 }
-                OptStageRef::TrimDeadBlocks => {
-                    wrap!("TrimDeadBlocks", opt_config.push_pass(OptPass::TrimDeadBlocks));
+                OptMetaStageRef::TrimDeadBlocks => {
+                    wrap!(
+                        "TrimDeadBlocks",
+                        opt_config.push_pass(OptPass::TrimDeadBlocks)
+                    );
                 }
-                OptStageRef::Debug => {
+                OptMetaStageRef::Debug => {
                     wrap_with_debug = true;
                 }
-                OptStageRef::DebugGraphviz => {
+                OptMetaStageRef::DebugGraphviz => {
                     wrap_with_debug_graphviz = true;
                 }
             }
         }
+
+        opt_config
+            .insert_debug_passes(&debug.iter().copied().map(OptPass::from).collect::<Vec<_>>());
 
         opt_config
     }
@@ -277,7 +352,7 @@ fn main() -> Result<()> {
     let mut warnings = Vec::new();
 
     let mut program_cfgs = BTreeMap::<VarId, ControlFlowGraph>::new();
-    let opt_config = OptStageRef::build_pipeline(&args.optimizations);
+    let opt_config = OptMetaStageRef::build_pipeline(&args.opt, &args.opt_debug);
 
     for top_level in &program.items {
         match &**top_level {
