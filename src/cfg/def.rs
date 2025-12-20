@@ -7,7 +7,7 @@ use std::{
 
 use crate::parser::{ast::VarId, span::Span};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BBId(pub(crate) usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]

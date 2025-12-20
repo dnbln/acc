@@ -1,6 +1,6 @@
 STDOUT:
 CFG Debug Dump Before Hoist Pass
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
   %2 = param[2] [var c]
@@ -11,17 +11,17 @@ BBId(0): % preds = []
   %17 = add %0, %1
   %18 = const.i64 0
   %19 = gt %17, %18
-  br_cond %19 ? BBId(1) : BBId(2)
+  br_cond %19 ? bb1 : bb2
 
 
-BBId(1): % preds = [BBId(0)]
+bb1: % preds = [bb0]
   %22 = add %1, %2
-  br BBId(2)
+  br bb2
 
 
-BBId(2): % preds = [BBId(0), BBId(1)]
-  %47 = Φ(%1@BB0, 2@BB1) [var b]
-  %48 = Φ(0@BB0, %22@BB1) [var y]
+bb2: % preds = [bb0, bb1]
+  %47 = Φ(%1@bb0, 2@bb1) [var b]
+  %48 = Φ(0@bb0, %22@bb1) [var y]
   %28 = add %47, %2
   %32 = add %7, %48
   %34 = add %32, %28
@@ -29,8 +29,20 @@ BBId(2): % preds = [BBId(0), BBId(1)]
 
 
 
+CFG Graphviz Dump Before Hoist Pass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  %17 = add %0, %1\n  %18 = const.i64 0\n  %19 = gt %17, %18\n  br_cond %19 ? bb1 : bb2\n"];
+  bb0 -> bb1 [color=green];
+  bb0 -> bb2 [color=red];
+  bb1 [label="bb1:\n  %22 = add %1, %2\n  br bb2\n"];
+  bb1 -> bb2;
+  bb2 [label="bb2:\n  %47 = Φ(%1@bb0, 2@bb1) [var b]\n  %48 = Φ(0@bb0, %22@bb1) [var y]\n  %28 = add %47, %2\n  %32 = add %7, %48\n  %34 = add %32, %28\n  return %34\n"];
+}
+
 CFG Debug Dump After Hoist Pass
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
   %2 = param[2] [var c]
@@ -39,16 +51,16 @@ BBId(0): % preds = []
   %11 = const.i64 0
   %12 = lt %10, %11
   %19 = gt %10, %11
-  br_cond %19 ? BBId(1) : BBId(2)
+  br_cond %19 ? bb1 : bb2
 
 
-BBId(1): % preds = [BBId(0)]
-  br BBId(2)
+bb1: % preds = [bb0]
+  br bb2
 
 
-BBId(2): % preds = [BBId(0), BBId(1)]
-  %47 = Φ(%1@BB0, 2@BB1) [var b]
-  %48 = Φ(0@BB0, %7@BB1) [var y]
+bb2: % preds = [bb0, bb1]
+  %47 = Φ(%1@bb0, 2@bb1) [var b]
+  %48 = Φ(0@bb0, %7@bb1) [var y]
   %28 = add %47, %2
   %32 = add %7, %48
   %34 = add %32, %28
@@ -56,8 +68,20 @@ BBId(2): % preds = [BBId(0), BBId(1)]
 
 
 
+CFG Graphviz Dump After Hoist Pass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  %19 = gt %10, %11\n  br_cond %19 ? bb1 : bb2\n"];
+  bb0 -> bb1 [color=green];
+  bb0 -> bb2 [color=red];
+  bb1 [label="bb1:\n  br bb2\n"];
+  bb1 -> bb2;
+  bb2 [label="bb2:\n  %47 = Φ(%1@bb0, 2@bb1) [var b]\n  %48 = Φ(0@bb0, %7@bb1) [var y]\n  %28 = add %47, %2\n  %32 = add %7, %48\n  %34 = add %32, %28\n  return %34\n"];
+}
+
 CFG for function foo:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
   %2 = param[2] [var c]

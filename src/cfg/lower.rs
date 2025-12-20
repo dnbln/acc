@@ -46,7 +46,11 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 
 use crate::{
     cfg::{
-        builder::{CfgBuilder, ValidateError}, cleanup::{OptPassConfig, cleanup_passes}, def::*, display, sema::SemaResults
+        builder::{CfgBuilder, ValidateError},
+        cleanup::{OptPassConfig, cleanup_passes},
+        def::*,
+        display,
+        sema::SemaResults,
     },
     diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
     parser::{
@@ -1531,13 +1535,13 @@ impl MalformedPhiInfo {
         let mut edges_missing_vars: BTreeMap<(BBId, BBId), BTreeSet<VarId>> = BTreeMap::new();
 
         for block in &self.blocks {
-            let mut s = format!("BB{}:\n", block.id.0);
+            let mut s = format!("{}:\n", block.id);
 
             for phi in &block.phi {
                 let sources_str = phi
                     .sources
                     .iter()
-                    .map(|(bb_id, val)| format!("{val}@BB{}", bb_id.0))
+                    .map(|(bb_id, val)| format!("{val}@{}", bb_id))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(&mut s, "    {} = Φ({}", phi.dest, sources_str).unwrap();
@@ -1559,7 +1563,6 @@ impl MalformedPhiInfo {
                             info.missing_sources
                                 .iter()
                                 .filter(|it| block.predecessors.contains(it))
-                                .map(|bb| bb.0)
                                 .collect::<Vec<_>>()
                         )
                         .unwrap();
@@ -1601,7 +1604,6 @@ impl MalformedPhiInfo {
                                         .iter()
                                         .filter(|it| block.predecessors.contains(it)
                                             || it == &&block.id)
-                                        .map(|bb| bb.0)
                                         .collect::<Vec<_>>()
                                 )
                                 .unwrap();
@@ -1619,22 +1621,17 @@ impl MalformedPhiInfo {
 
             match &block.tail {
                 TailCfgInstruction::UncondBranch { target } => {
-                    writeln!(&mut s, "    br BB{}", target.0).unwrap();
+                    writeln!(&mut s, "    br {}", target).unwrap();
                 }
                 TailCfgInstruction::CondBranch {
                     cond,
                     then_bb,
                     else_bb,
                 } => {
-                    writeln!(
-                        &mut s,
-                        "    br_cond {} ? BB{} : BB{};",
-                        cond, then_bb.0, else_bb.0
-                    )
-                    .unwrap();
+                    writeln!(&mut s, "    br_cond {cond} ? {then_bb} : {else_bb}").unwrap();
                 }
                 TailCfgInstruction::Return { value: Some(value) } => {
-                    writeln!(&mut s, "    return {}", value).unwrap();
+                    writeln!(&mut s, "    return {value}").unwrap();
                 }
                 TailCfgInstruction::Return { value: None } => {
                     writeln!(&mut s, "    return").unwrap();
@@ -1644,7 +1641,7 @@ impl MalformedPhiInfo {
                 }
             }
 
-            writeln!(&mut output, "  BB{} [label={s:?}];", block.id.0).unwrap();
+            writeln!(&mut output, "  {} [label={s:?}];", block.id).unwrap();
         }
 
         fn get_missing_vars_label(
@@ -1675,10 +1672,9 @@ impl MalformedPhiInfo {
                     let missing_vars_extra =
                         get_missing_vars_label(&edges_missing_vars, block.id, *target, sema);
                     if let Some(extra) = missing_vars_extra {
-                        writeln!(output, "  BB{} -> BB{} [{}];", block.id.0, target.0, extra)
-                            .unwrap();
+                        writeln!(output, "  {} -> {} [{}];", block.id, target, extra).unwrap();
                     } else {
-                        writeln!(output, "  BB{} -> BB{};", block.id.0, target.0).unwrap();
+                        writeln!(output, "  {} -> {};", block.id, target).unwrap();
                     }
                 }
 
@@ -1691,30 +1687,24 @@ impl MalformedPhiInfo {
                     if let Some(extra) = missing_vars_then {
                         writeln!(
                             output,
-                            "  BB{} -> BB{} [color=green,{}];",
-                            block.id.0, then_bb.0, extra
+                            "  {} -> {} [color=green,{}];",
+                            block.id, then_bb, extra
                         )
                         .unwrap();
                     } else {
-                        writeln!(
-                            output,
-                            "  BB{} -> BB{} [color=green];",
-                            block.id.0, then_bb.0
-                        )
-                        .unwrap();
+                        writeln!(output, "  {} -> {} [color=green];", block.id, then_bb).unwrap();
                     }
                     let missing_vars_else =
                         get_missing_vars_label(&edges_missing_vars, block.id, *else_bb, sema);
                     if let Some(extra) = missing_vars_else {
                         writeln!(
                             output,
-                            "  BB{} -> BB{} [color=red,{}];",
-                            block.id.0, else_bb.0, extra
+                            "  {} -> {} [color=red,{}];",
+                            block.id, else_bb, extra
                         )
                         .unwrap();
                     } else {
-                        writeln!(output, "  BB{} -> BB{} [color=red];", block.id.0, else_bb.0)
-                            .unwrap();
+                        writeln!(output, "  {} -> {} [color=red];", block.id, else_bb).unwrap();
                     }
                 }
                 TailCfgInstruction::Return { .. } | TailCfgInstruction::Undefined => {}

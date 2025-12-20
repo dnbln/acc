@@ -1,6 +1,6 @@
 STDOUT:
 CFG for function main:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
   %4 = add %0, %1

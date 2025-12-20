@@ -1792,49 +1792,49 @@ impl OptPassConfig {
         for pass in std::mem::take(&mut self.passes) {
             let d = debug.contains(&pass);
             if d {
-                self.passes.push(OptPass::Debug {
-                    name: match pass {
-                        OptPass::ConstantPropagation => "Before Constant Propagation",
-                        OptPass::DeadValueElimination => "Before Dead Value Elimination",
-                        OptPass::CpDveAndTdbLoop => "Before CP,DVE and TDB Loop",
-                        OptPass::BlockInliner => "Before Block Inliner",
-                        OptPass::HoistPass => "Before Hoist Pass",
-                        OptPass::PhiSimplification => "Before Phi Simplification",
-                        OptPass::ValueInliner => "Before Value Inliner",
-                        OptPass::ValueInlinerPhiSimplificationLoop => {
-                            "Before Value Inliner Phi Simplification Loop"
-                        }
-                        OptPass::PhiToSelect => "Before Phi to Select",
-                        OptPass::BlockDedup => "Before Block Deduplication",
-                        OptPass::TailUnification => "Before Tail Unification",
-                        OptPass::TrimDeadBlocks => "Before Trim Dead Blocks",
-                        OptPass::Debug { name } => name,
-                        OptPass::DebugGraphviz { name } => name,
-                    },
-                });
+                let name = match pass {
+                    OptPass::ConstantPropagation => "Before Constant Propagation",
+                    OptPass::DeadValueElimination => "Before Dead Value Elimination",
+                    OptPass::CpDveAndTdbLoop => "Before CP,DVE and TDB Loop",
+                    OptPass::BlockInliner => "Before Block Inliner",
+                    OptPass::HoistPass => "Before Hoist Pass",
+                    OptPass::PhiSimplification => "Before Phi Simplification",
+                    OptPass::ValueInliner => "Before Value Inliner",
+                    OptPass::ValueInlinerPhiSimplificationLoop => {
+                        "Before Value Inliner Phi Simplification Loop"
+                    }
+                    OptPass::PhiToSelect => "Before Phi to Select",
+                    OptPass::BlockDedup => "Before Block Deduplication",
+                    OptPass::TailUnification => "Before Tail Unification",
+                    OptPass::TrimDeadBlocks => "Before Trim Dead Blocks",
+                    OptPass::Debug { name } => name,
+                    OptPass::DebugGraphviz { name } => name,
+                };
+                self.passes.push(OptPass::Debug { name });
+                self.passes.push(OptPass::DebugGraphviz { name });
             }
             self.passes.push(pass);
             if d {
-                self.passes.push(OptPass::Debug {
-                    name: match pass {
-                        OptPass::ConstantPropagation => "After Constant Propagation",
-                        OptPass::DeadValueElimination => "After Dead Value Elimination",
-                        OptPass::CpDveAndTdbLoop => "After CP,DVE and TDB Loop",
-                        OptPass::BlockInliner => "After Block Inliner",
-                        OptPass::HoistPass => "After Hoist Pass",
-                        OptPass::PhiSimplification => "After Phi Simplification",
-                        OptPass::ValueInliner => "After Value Inliner",
-                        OptPass::ValueInlinerPhiSimplificationLoop => {
-                            "After Value Inliner Phi Simplification Loop"
-                        }
-                        OptPass::PhiToSelect => "After Phi to Select",
-                        OptPass::BlockDedup => "After Block Deduplication",
-                        OptPass::TailUnification => "After Tail Unification",
-                        OptPass::TrimDeadBlocks => "After Trim Dead Blocks",
-                        OptPass::Debug { name } => name,
-                        OptPass::DebugGraphviz { name } => name,
-                    },
-                });
+                let name = match pass {
+                    OptPass::ConstantPropagation => "After Constant Propagation",
+                    OptPass::DeadValueElimination => "After Dead Value Elimination",
+                    OptPass::CpDveAndTdbLoop => "After CP,DVE and TDB Loop",
+                    OptPass::BlockInliner => "After Block Inliner",
+                    OptPass::HoistPass => "After Hoist Pass",
+                    OptPass::PhiSimplification => "After Phi Simplification",
+                    OptPass::ValueInliner => "After Value Inliner",
+                    OptPass::ValueInlinerPhiSimplificationLoop => {
+                        "After Value Inliner Phi Simplification Loop"
+                    }
+                    OptPass::PhiToSelect => "After Phi to Select",
+                    OptPass::BlockDedup => "After Block Deduplication",
+                    OptPass::TailUnification => "After Tail Unification",
+                    OptPass::TrimDeadBlocks => "After Trim Dead Blocks",
+                    OptPass::Debug { name } => name,
+                    OptPass::DebugGraphviz { name } => name,
+                };
+                self.passes.push(OptPass::Debug { name });
+                self.passes.push(OptPass::DebugGraphviz { name });
             }
         }
     }

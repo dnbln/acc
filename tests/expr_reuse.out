@@ -1,20 +1,20 @@
 STDOUT:
 CFG for function foo:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
   %2 = param[2] [var c]
   %10 = add %0, %1
   %11 = const.i64 0
   %19 = gt %10, %11
-  br_cond %19 ? BBId(1) : BBId(2)
+  br_cond %19 ? bb1 : bb2
 
-BBId(1): % preds = [BBId(0)]
+bb1: % preds = [bb0]
   %22 = add %1, %2
-  br BBId(2)
+  br bb2
 
-BBId(2): % preds = [BBId(0), BBId(1)]
-  %44 = Φ(0@BB0, %22@BB1) [var y]
+bb2: % preds = [bb0, bb1]
+  %44 = Φ(0@bb0, %22@bb1) [var y]
   return %44
 
 

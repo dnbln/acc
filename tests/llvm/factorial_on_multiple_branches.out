@@ -1,18 +1,18 @@
 STDOUT:
 CFG Debug Dump Before Hoist Pass
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var n]
   %2 = const.i64 1
   %3 = leq %0, %2
-  br_cond %3 ? BBId(1) : BBId(2)
+  br_cond %3 ? bb1 : bb2
 
 
-BBId(1): % preds = [BBId(0)]
+bb1: % preds = [bb0]
   %4 = const.i64 1
   return %4
 
 
-BBId(2): % preds = [BBId(0)]
+bb2: % preds = [bb0]
   %6 = function v1 [var factorial]
   %8 = const.i64 1
   %9 = sub %0, %8
@@ -22,19 +22,30 @@ BBId(2): % preds = [BBId(0)]
 
 
 
+CFG Graphviz Dump Before Hoist Pass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+  bb0 -> bb1 [color=green];
+  bb0 -> bb2 [color=red];
+  bb1 [label="bb1:\n  %4 = const.i64 1\n  return %4\n"];
+  bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %8 = const.i64 1\n  %9 = sub %0, %8\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+}
+
 CFG Debug Dump After Hoist Pass
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var n]
   %2 = const.i64 1
   %3 = leq %0, %2
-  br_cond %3 ? BBId(1) : BBId(2)
+  br_cond %3 ? bb1 : bb2
 
 
-BBId(1): % preds = [BBId(0)]
+bb1: % preds = [bb0]
   return %2
 
 
-BBId(2): % preds = [BBId(0)]
+bb2: % preds = [bb0]
   %6 = function v1 [var factorial]
   %9 = sub %0, %2
   %10 = call %6(%9)
@@ -43,17 +54,28 @@ BBId(2): % preds = [BBId(0)]
 
 
 
+CFG Graphviz Dump After Hoist Pass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+  bb0 -> bb1 [color=green];
+  bb0 -> bb2 [color=red];
+  bb1 [label="bb1:\n  return %2\n"];
+  bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+}
+
 CFG for function factorial:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var n]
   %2 = const.i64 1
   %3 = leq %0, %2
-  br_cond %3 ? BBId(1) : BBId(2)
+  br_cond %3 ? bb1 : bb2
 
-BBId(1): % preds = [BBId(0)]
+bb1: % preds = [bb0]
   return %2
 
-BBId(2): % preds = [BBId(0)]
+bb2: % preds = [bb0]
   %6 = function v1 [var factorial]
   %9 = sub %0, %2
   %10 = call %6(%9)
@@ -62,77 +84,105 @@ BBId(2): % preds = [BBId(0)]
 
 
 CFG Debug Dump Before Hoist Pass
-BBId(0): % preds = []
-  br BBId(1)
+bb0: % preds = []
+  br bb1
 
 
-BBId(1): % preds = [BBId(0), BBId(2)]
-  %30 = Φ(0@BB0, %17@BB2) [var i]
-  %33 = Φ(2@BB0, %13@BB2) [var result]
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(2@bb0, %13@bb2) [var result]
   %10 = const.i64 3
   %11 = lt %30, %10
-  br_cond %11 ? BBId(2) : BBId(3)
+  br_cond %11 ? bb2 : bb3
 
 
-BBId(2): % preds = [BBId(1)]
+bb2: % preds = [bb1]
   %13 = add %33, %30 [var result]
   %16 = const.i64 1
   %17 = add %30, %16
-  br BBId(1)
+  br bb1
 
 
-BBId(3): % preds = [BBId(1)]
+bb3: % preds = [bb1]
   %21 = function v1 [var factorial]
   %23 = call %21(%33)
   return %23
 
 
+
+CFG Graphviz Dump Before Hoist Pass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  bb0 [label="bb0:\n  br bb1\n"];
+  bb0 -> bb1;
+  bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(2@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+  bb1 -> bb2 [color=green];
+  bb1 -> bb3 [color=red];
+  bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+  bb2 -> bb1;
+  bb3 [label="bb3:\n  %21 = function v1 [var factorial]\n  %23 = call %21(%33)\n  return %23\n"];
+}
 
 CFG Debug Dump After Hoist Pass
-BBId(0): % preds = []
-  br BBId(1)
+bb0: % preds = []
+  br bb1
 
 
-BBId(1): % preds = [BBId(0), BBId(2)]
-  %30 = Φ(0@BB0, %17@BB2) [var i]
-  %33 = Φ(2@BB0, %13@BB2) [var result]
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(2@bb0, %13@bb2) [var result]
   %10 = const.i64 3
   %11 = lt %30, %10
-  br_cond %11 ? BBId(2) : BBId(3)
+  br_cond %11 ? bb2 : bb3
 
 
-BBId(2): % preds = [BBId(1)]
+bb2: % preds = [bb1]
   %13 = add %33, %30 [var result]
   %16 = const.i64 1
   %17 = add %30, %16
-  br BBId(1)
+  br bb1
 
 
-BBId(3): % preds = [BBId(1)]
+bb3: % preds = [bb1]
   %21 = function v1 [var factorial]
   %23 = call %21(%33)
   return %23
 
 
 
-CFG for function main:
-BBId(0): % preds = []
-  br BBId(1)
+CFG Graphviz Dump After Hoist Pass
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+  bb0 [label="bb0:\n  br bb1\n"];
+  bb0 -> bb1;
+  bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(2@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+  bb1 -> bb2 [color=green];
+  bb1 -> bb3 [color=red];
+  bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+  bb2 -> bb1;
+  bb3 [label="bb3:\n  %21 = function v1 [var factorial]\n  %23 = call %21(%33)\n  return %23\n"];
+}
 
-BBId(1): % preds = [BBId(0), BBId(2)]
-  %30 = Φ(0@BB0, %17@BB2) [var i]
-  %33 = Φ(2@BB0, %13@BB2) [var result]
+CFG for function main:
+bb0: % preds = []
+  br bb1
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(2@bb0, %13@bb2) [var result]
   %10 = const.i64 3
   %11 = lt %30, %10
-  br_cond %11 ? BBId(2) : BBId(3)
+  br_cond %11 ? bb2 : bb3
 
-BBId(2): % preds = [BBId(1)]
+bb2: % preds = [bb1]
   %13 = add %33, %30 [var result]
   %16 = const.i64 1
   %17 = add %30, %16
-  br BBId(1)
+  br bb1
 
-BBId(3): % preds = [BBId(1)]
+bb3: % preds = [bb1]
   %21 = function v1 [var factorial]
   %23 = call %21(%33)
   return %23
