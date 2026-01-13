@@ -2,6 +2,7 @@
 
 **Responsible TA**: Arthur Jacques
 
+[Link to the Report](./Report_CC.pdf).
 
 To run, just do `cargo run`
 
@@ -15,3 +16,22 @@ Then run with the `--features llvm-backend` flag:
 ```sh
 cargo run --features llvm-backend
 ```
+
+
+## Testing
+
+Refer to the testing section in the report.
+
+TL;DR:
+
+```sh
+cargo test
+```
+
+Or
+
+```sh
+cargo test --features llvm-backend
+```
+
+To run the LLVM backend tests as well.
