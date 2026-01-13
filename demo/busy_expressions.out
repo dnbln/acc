@@ -97,9 +97,9 @@ bb0: % preds = []
   %9 = mul %0, %1
   %12 = lt %2, %3
   %44 = sub %0, %1
-  %46 = select %12, %44, %6 [var x]
-  %47 = select %12, %9, %44 [var y]
-  %23 = mul %46, %47
+  %45 = select %12, %44, %6 [var x]
+  %46 = select %12, %9, %44 [var y]
+  %23 = mul %45, %46
   return %23
 
 

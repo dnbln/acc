@@ -7,9 +7,9 @@ bb0: % preds = []
   %7 = mul %0, %1
   %8 = const.i64 1
   %32 = sub %0, %1
-  %34 = select %8, %32, %4 [var x]
-  %35 = select %8, %7, %32 [var y]
-  %19 = add %34, %35
+  %33 = select %8, %32, %4 [var x]
+  %34 = select %8, %7, %32 [var y]
+  %19 = add %33, %34
   return %19
 
 

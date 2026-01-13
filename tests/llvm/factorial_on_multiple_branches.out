@@ -330,6 +330,201 @@ digraph CFG {
 
 }
 
+CFG Debug Dump Before Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var n]
+  %2 = const.i64 1
+  %3 = leq %0, %2
+  br_cond %3 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  return %2
+
+
+bb2: % preds = [bb0]
+  %6 = function v1 [var factorial]
+  %9 = sub %0, %2
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+
+CFG Debug Dump After Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var n]
+  %2 = const.i64 1
+  %3 = leq %0, %2
+  br_cond %3 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  return %2
+
+
+bb2: % preds = [bb0]
+  %6 = function v1 [var factorial]
+  %9 = sub %0, %2
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+
+CFG Graphviz Before and After After Phi to Select:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  return %2\n"];
+    before_bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  return %2\n"];
+    after_bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var n]
+  %2 = const.i64 1
+  %3 = leq %0, %2
+  br_cond %3 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  return %2
+
+
+bb2: % preds = [bb0]
+  %6 = function v1 [var factorial]
+  %9 = sub %0, %2
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+
+CFG Debug Dump After Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var n]
+  %2 = const.i64 1
+  %3 = leq %0, %2
+  br_cond %3 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  return %2
+
+
+bb2: % preds = [bb0]
+  %6 = function v1 [var factorial]
+  %9 = sub %0, %2
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+
+CFG Graphviz Before and After After Block Deduplication:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  return %2\n"];
+    before_bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  return %2\n"];
+    after_bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var n]
+  %2 = const.i64 1
+  %3 = leq %0, %2
+  br_cond %3 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  return %2
+
+
+bb2: % preds = [bb0]
+  %6 = function v1 [var factorial]
+  %9 = sub %0, %2
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+
+CFG Debug Dump After Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var n]
+  %2 = const.i64 1
+  %3 = leq %0, %2
+  br_cond %3 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  return %2
+
+
+bb2: % preds = [bb0]
+  %6 = function v1 [var factorial]
+  %9 = sub %0, %2
+  %10 = call %6(%9)
+  %11 = mul %0, %10
+  return %11
+
+
+
+CFG Graphviz Before and After After Block Inliner:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  return %2\n"];
+    before_bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var n]\n  %2 = const.i64 1\n  %3 = leq %0, %2\n  br_cond %3 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  return %2\n"];
+    after_bb2 [label="bb2:\n  %6 = function v1 [var factorial]\n  %9 = sub %0, %2\n  %10 = call %6(%9)\n  %11 = mul %0, %10\n  return %11\n"];
+  }
+
+}
+
 CFG for function factorial:
 bb0: % preds = []
   %0 = param[0] [var n]
@@ -1097,6 +1292,291 @@ digraph CFG {
 
 }
 
+CFG Debug Dump Before Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var x]
+  %2 = const.i64 10
+  %3 = lt %0, %2
+  %52 = const.i64 2 [var result]
+  %53 = const.i64 3 [var result]
+  %51 = select %3, %52, %53 [var result]
+  br bb1
+
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(%51@bb0, %13@bb2) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
+  br_cond %11 ? bb2 : bb3
+
+
+bb2: % preds = [bb1]
+  %13 = add %33, %30 [var result]
+  %16 = const.i64 1
+  %17 = add %30, %16
+  br bb1
+
+
+bb3: % preds = [bb1]
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
+
+
+
+CFG Debug Dump After Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var x]
+  %2 = const.i64 10
+  %3 = lt %0, %2
+  %52 = const.i64 2 [var result]
+  %53 = const.i64 3 [var result]
+  %51 = select %3, %52, %53 [var result]
+  br bb1
+
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(%51@bb0, %13@bb2) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
+  br_cond %11 ? bb2 : bb3
+
+
+bb2: % preds = [bb1]
+  %13 = add %33, %30 [var result]
+  %16 = const.i64 1
+  %17 = add %30, %16
+  br bb1
+
+
+bb3: % preds = [bb1]
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
+
+
+
+CFG Graphviz Before and After After Phi to Select:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var x]\n  %2 = const.i64 10\n  %3 = lt %0, %2\n  %52 = const.i64 2 [var result]\n  %53 = const.i64 3 [var result]\n  %51 = select %3, %52, %53 [var result]\n  br bb1\n"];
+    before_bb0 -> before_bb1;
+    before_bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(%51@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+    before_bb1 -> before_bb2 [color=green];
+    before_bb1 -> before_bb3 [color=red];
+    before_bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+    before_bb2 -> before_bb1;
+    before_bb3 [label="bb3:\n  %49 = function v1 [var factorial]\n  %50 = call %49(%33)\n  return %50\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var x]\n  %2 = const.i64 10\n  %3 = lt %0, %2\n  %52 = const.i64 2 [var result]\n  %53 = const.i64 3 [var result]\n  %51 = select %3, %52, %53 [var result]\n  br bb1\n"];
+    after_bb0 -> after_bb1;
+    after_bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(%51@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+    after_bb1 -> after_bb2 [color=green];
+    after_bb1 -> after_bb3 [color=red];
+    after_bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+    after_bb2 -> after_bb1;
+    after_bb3 [label="bb3:\n  %49 = function v1 [var factorial]\n  %50 = call %49(%33)\n  return %50\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var x]
+  %2 = const.i64 10
+  %3 = lt %0, %2
+  %52 = const.i64 2 [var result]
+  %53 = const.i64 3 [var result]
+  %51 = select %3, %52, %53 [var result]
+  br bb1
+
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(%51@bb0, %13@bb2) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
+  br_cond %11 ? bb2 : bb3
+
+
+bb2: % preds = [bb1]
+  %13 = add %33, %30 [var result]
+  %16 = const.i64 1
+  %17 = add %30, %16
+  br bb1
+
+
+bb3: % preds = [bb1]
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
+
+
+
+CFG Debug Dump After Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var x]
+  %2 = const.i64 10
+  %3 = lt %0, %2
+  %52 = const.i64 2 [var result]
+  %53 = const.i64 3 [var result]
+  %51 = select %3, %52, %53 [var result]
+  br bb1
+
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(%51@bb0, %13@bb2) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
+  br_cond %11 ? bb2 : bb3
+
+
+bb2: % preds = [bb1]
+  %13 = add %33, %30 [var result]
+  %16 = const.i64 1
+  %17 = add %30, %16
+  br bb1
+
+
+bb3: % preds = [bb1]
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
+
+
+
+CFG Graphviz Before and After After Block Deduplication:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var x]\n  %2 = const.i64 10\n  %3 = lt %0, %2\n  %52 = const.i64 2 [var result]\n  %53 = const.i64 3 [var result]\n  %51 = select %3, %52, %53 [var result]\n  br bb1\n"];
+    before_bb0 -> before_bb1;
+    before_bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(%51@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+    before_bb1 -> before_bb2 [color=green];
+    before_bb1 -> before_bb3 [color=red];
+    before_bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+    before_bb2 -> before_bb1;
+    before_bb3 [label="bb3:\n  %49 = function v1 [var factorial]\n  %50 = call %49(%33)\n  return %50\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var x]\n  %2 = const.i64 10\n  %3 = lt %0, %2\n  %52 = const.i64 2 [var result]\n  %53 = const.i64 3 [var result]\n  %51 = select %3, %52, %53 [var result]\n  br bb1\n"];
+    after_bb0 -> after_bb1;
+    after_bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(%51@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+    after_bb1 -> after_bb2 [color=green];
+    after_bb1 -> after_bb3 [color=red];
+    after_bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+    after_bb2 -> after_bb1;
+    after_bb3 [label="bb3:\n  %49 = function v1 [var factorial]\n  %50 = call %49(%33)\n  return %50\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var x]
+  %2 = const.i64 10
+  %3 = lt %0, %2
+  %52 = const.i64 2 [var result]
+  %53 = const.i64 3 [var result]
+  %51 = select %3, %52, %53 [var result]
+  br bb1
+
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(%51@bb0, %13@bb2) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
+  br_cond %11 ? bb2 : bb3
+
+
+bb2: % preds = [bb1]
+  %13 = add %33, %30 [var result]
+  %16 = const.i64 1
+  %17 = add %30, %16
+  br bb1
+
+
+bb3: % preds = [bb1]
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
+
+
+
+CFG Debug Dump After Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var x]
+  %2 = const.i64 10
+  %3 = lt %0, %2
+  %52 = const.i64 2 [var result]
+  %53 = const.i64 3 [var result]
+  %51 = select %3, %52, %53 [var result]
+  br bb1
+
+
+bb1: % preds = [bb0, bb2]
+  %30 = Φ(0@bb0, %17@bb2) [var i]
+  %33 = Φ(%51@bb0, %13@bb2) [var result]
+  %10 = const.i64 3
+  %11 = lt %30, %10
+  br_cond %11 ? bb2 : bb3
+
+
+bb2: % preds = [bb1]
+  %13 = add %33, %30 [var result]
+  %16 = const.i64 1
+  %17 = add %30, %16
+  br bb1
+
+
+bb3: % preds = [bb1]
+  %49 = function v1 [var factorial]
+  %50 = call %49(%33)
+  return %50
+
+
+
+CFG Graphviz Before and After After Block Inliner:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var x]\n  %2 = const.i64 10\n  %3 = lt %0, %2\n  %52 = const.i64 2 [var result]\n  %53 = const.i64 3 [var result]\n  %51 = select %3, %52, %53 [var result]\n  br bb1\n"];
+    before_bb0 -> before_bb1;
+    before_bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(%51@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+    before_bb1 -> before_bb2 [color=green];
+    before_bb1 -> before_bb3 [color=red];
+    before_bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+    before_bb2 -> before_bb1;
+    before_bb3 [label="bb3:\n  %49 = function v1 [var factorial]\n  %50 = call %49(%33)\n  return %50\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var x]\n  %2 = const.i64 10\n  %3 = lt %0, %2\n  %52 = const.i64 2 [var result]\n  %53 = const.i64 3 [var result]\n  %51 = select %3, %52, %53 [var result]\n  br bb1\n"];
+    after_bb0 -> after_bb1;
+    after_bb1 [label="bb1:\n  %30 = Φ(0@bb0, %17@bb2) [var i]\n  %33 = Φ(%51@bb0, %13@bb2) [var result]\n  %10 = const.i64 3\n  %11 = lt %30, %10\n  br_cond %11 ? bb2 : bb3\n"];
+    after_bb1 -> after_bb2 [color=green];
+    after_bb1 -> after_bb3 [color=red];
+    after_bb2 [label="bb2:\n  %13 = add %33, %30 [var result]\n  %16 = const.i64 1\n  %17 = add %30, %16\n  br bb1\n"];
+    after_bb2 -> after_bb1;
+    after_bb3 [label="bb3:\n  %49 = function v1 [var factorial]\n  %50 = call %49(%33)\n  return %50\n"];
+  }
+
+}
+
 CFG for function f:
 bb0: % preds = []
   %0 = param[0] [var x]
@@ -1178,6 +1658,105 @@ bb0: % preds = []
 
 
 CFG Graphviz Before and After After Hoist Pass:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = function v5 [var f]\n  %1 = const.i64 5\n  %2 = call %0(%1)\n  return %2\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = function v5 [var f]\n  %1 = const.i64 5\n  %2 = call %0(%1)\n  return %2\n"];
+  }
+
+}
+
+CFG Debug Dump Before Phi to Select
+bb0: % preds = []
+  %0 = function v5 [var f]
+  %1 = const.i64 5
+  %2 = call %0(%1)
+  return %2
+
+
+
+CFG Debug Dump After Phi to Select
+bb0: % preds = []
+  %0 = function v5 [var f]
+  %1 = const.i64 5
+  %2 = call %0(%1)
+  return %2
+
+
+
+CFG Graphviz Before and After After Phi to Select:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = function v5 [var f]\n  %1 = const.i64 5\n  %2 = call %0(%1)\n  return %2\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = function v5 [var f]\n  %1 = const.i64 5\n  %2 = call %0(%1)\n  return %2\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Deduplication
+bb0: % preds = []
+  %0 = function v5 [var f]
+  %1 = const.i64 5
+  %2 = call %0(%1)
+  return %2
+
+
+
+CFG Debug Dump After Block Deduplication
+bb0: % preds = []
+  %0 = function v5 [var f]
+  %1 = const.i64 5
+  %2 = call %0(%1)
+  return %2
+
+
+
+CFG Graphviz Before and After After Block Deduplication:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = function v5 [var f]\n  %1 = const.i64 5\n  %2 = call %0(%1)\n  return %2\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = function v5 [var f]\n  %1 = const.i64 5\n  %2 = call %0(%1)\n  return %2\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Inliner
+bb0: % preds = []
+  %0 = function v5 [var f]
+  %1 = const.i64 5
+  %2 = call %0(%1)
+  return %2
+
+
+
+CFG Debug Dump After Block Inliner
+bb0: % preds = []
+  %0 = function v5 [var f]
+  %1 = const.i64 5
+  %2 = call %0(%1)
+  return %2
+
+
+
+CFG Graphviz Before and After After Block Inliner:
 digraph CFG {
   node [shape=box, fontname="Courier New", fontsize=10];
   edge [fontname="Courier New", fontsize=9];

@@ -411,6 +411,171 @@ digraph CFG {
 
 }
 
+CFG Debug Dump Before Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %19 = gt %10, %11
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
+
+
+
+CFG Debug Dump After Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %19 = gt %10, %11
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
+
+
+
+CFG Graphviz Before and After After Phi to Select:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %19 = gt %10, %11\n  %60 = const.i64 2 [var b]\n  %59 = select %19, %60, %1 [var b]\n  %62 = const.i64 0 [var y]\n  %61 = select %19, %7, %62 [var y]\n  %28 = add %59, %2\n  %32 = add %7, %61\n  %34 = add %32, %28\n  return %34\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %19 = gt %10, %11\n  %60 = const.i64 2 [var b]\n  %59 = select %19, %60, %1 [var b]\n  %62 = const.i64 0 [var y]\n  %61 = select %19, %7, %62 [var y]\n  %28 = add %59, %2\n  %32 = add %7, %61\n  %34 = add %32, %28\n  return %34\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %19 = gt %10, %11
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
+
+
+
+CFG Debug Dump After Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %19 = gt %10, %11
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
+
+
+
+CFG Graphviz Before and After After Block Deduplication:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %19 = gt %10, %11\n  %60 = const.i64 2 [var b]\n  %59 = select %19, %60, %1 [var b]\n  %62 = const.i64 0 [var y]\n  %61 = select %19, %7, %62 [var y]\n  %28 = add %59, %2\n  %32 = add %7, %61\n  %34 = add %32, %28\n  return %34\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %19 = gt %10, %11\n  %60 = const.i64 2 [var b]\n  %59 = select %19, %60, %1 [var b]\n  %62 = const.i64 0 [var y]\n  %61 = select %19, %7, %62 [var y]\n  %28 = add %59, %2\n  %32 = add %7, %61\n  %34 = add %32, %28\n  return %34\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %19 = gt %10, %11
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
+
+
+
+CFG Debug Dump After Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %19 = gt %10, %11
+  %60 = const.i64 2 [var b]
+  %59 = select %19, %60, %1 [var b]
+  %62 = const.i64 0 [var y]
+  %61 = select %19, %7, %62 [var y]
+  %28 = add %59, %2
+  %32 = add %7, %61
+  %34 = add %32, %28
+  return %34
+
+
+
+CFG Graphviz Before and After After Block Inliner:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %19 = gt %10, %11\n  %60 = const.i64 2 [var b]\n  %59 = select %19, %60, %1 [var b]\n  %62 = const.i64 0 [var y]\n  %61 = select %19, %7, %62 [var y]\n  %28 = add %59, %2\n  %32 = add %7, %61\n  %34 = add %32, %28\n  return %34\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %19 = gt %10, %11\n  %60 = const.i64 2 [var b]\n  %59 = select %19, %60, %1 [var b]\n  %62 = const.i64 0 [var y]\n  %61 = select %19, %7, %62 [var y]\n  %28 = add %59, %2\n  %32 = add %7, %61\n  %34 = add %32, %28\n  return %34\n"];
+  }
+
+}
+
 CFG for function foo:
 bb0: % preds = []
   %0 = param[0] [var a]

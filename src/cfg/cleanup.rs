@@ -1051,15 +1051,28 @@ fn compute_top_level(
                 break;
             }
 
-            let parent = builder.blocks[p.0].predecessors[0];
+            let parent = builder[p].predecessors[0];
 
-            if builder.blocks[parent.0]
+            if builder[parent]
                 .successors
                 .iter()
                 .any(|pr| !ascendents.contains(&pr) && !expr_dominated.contains(&pr))
             {
                 break;
             }
+
+            // if builder[p].instructions.iter().any(|instr| {
+            //     dbg!(matches!(
+            //         instr,
+            //         CfgInstruction::Assign {
+            //             val: RValue::Call { .. },
+            //             dest: _
+            //         }
+            //     ))
+            // }) {
+            //     // do not hoist over function calls
+            //     break;
+            // }
 
             p = parent;
         }
@@ -1233,7 +1246,8 @@ fn hoist_pass(builder: &mut CfgBuilder) {
             for instr in &bb.instructions {
                 if let CfgInstruction::Assign { dest, val } = instr
                     // only hoist pure RValues, calls may have side effects, and hoisitng function references is not useful
-                    && !matches!(val, RValue::Call { .. } | RValue::Function { .. })
+                    // assume all Calls are pure.
+                    // && !matches!(val, RValue::Call { .. } | RValue::Function { .. })
                 {
                     exprs
                         .entry(canonicalize(val))
@@ -1388,86 +1402,86 @@ fn hoist_pass(builder: &mut CfgBuilder) {
 
         // attempt to hoist out of branches (function calls)
 
-        let mut to_hoist = Vec::new();
-        for bb in &builder.blocks {
-            if let TailCfgInstruction::CondBranch {
-                cond: _,
-                then_bb,
-                else_bb,
-            } = &bb.tail
-            {
-                let then_block = &builder.blocks[then_bb.0];
-                let else_block = &builder.blocks[else_bb.0];
+        // let mut to_hoist = Vec::new();
+        // for bb in &builder.blocks {
+        //     if let TailCfgInstruction::CondBranch {
+        //         cond: _,
+        //         then_bb,
+        //         else_bb,
+        //     } = &bb.tail
+        //     {
+        //         let then_block = &builder.blocks[then_bb.0];
+        //         let else_block = &builder.blocks[else_bb.0];
 
-                let mut then_exprs = BTreeMap::<RValue, ValueRef>::new();
-                let mut first_call = true;
-                for instr in &then_block.instructions {
-                    if let CfgInstruction::Assign { dest, val } = instr {
-                        if matches!(val, RValue::Call { .. }) {
-                            // we can only hoist one function call at a time to avoid function call ordering issues
-                            // e.g., if both branches call the same function *first*, we can hoist it
-                            if first_call {
-                                first_call = false;
-                            } else {
-                                continue;
-                            }
-                        }
-                        then_exprs.insert(canonicalize(val), *dest);
-                    }
-                }
+        //         let mut then_exprs = BTreeMap::<RValue, ValueRef>::new();
+        //         let mut first_call = true;
+        //         for instr in &then_block.instructions {
+        //             if let CfgInstruction::Assign { dest, val } = instr {
+        //                 if matches!(val, RValue::Call { .. }) {
+        //                     // we can only hoist one function call at a time to avoid function call ordering issues
+        //                     // e.g., if both branches call the same function *first*, we can hoist it
+        //                     if first_call {
+        //                         first_call = false;
+        //                     } else {
+        //                         continue;
+        //                     }
+        //                 }
+        //                 then_exprs.insert(canonicalize(val), *dest);
+        //             }
+        //         }
 
-                let mut first_call = true;
-                for instr in &else_block.instructions {
-                    if let CfgInstruction::Assign { dest, val } = instr {
-                        if matches!(val, RValue::Call { .. }) {
-                            // we can only hoist one function call at a time to avoid function call ordering issues
-                            // e.g., if both branches call the same function *first*, we can hoist it
-                            if first_call {
-                                first_call = false;
-                            } else {
-                                continue;
-                            }
-                        }
-                        let canonical_val = canonicalize(val);
-                        if let Some(then_dest) = then_exprs.get(&canonical_val) {
-                            to_hoist.push((
-                                canonical_val,
-                                *then_dest,
-                                *dest,
-                                bb.id,
-                                *then_bb,
-                                *else_bb,
-                            ));
-                        }
-                    }
-                }
-            }
-        }
+        //         let mut first_call = true;
+        //         for instr in &else_block.instructions {
+        //             if let CfgInstruction::Assign { dest, val } = instr {
+        //                 if matches!(val, RValue::Call { .. }) {
+        //                     // we can only hoist one function call at a time to avoid function call ordering issues
+        //                     // e.g., if both branches call the same function *first*, we can hoist it
+        //                     if first_call {
+        //                         first_call = false;
+        //                     } else {
+        //                         continue;
+        //                     }
+        //                 }
+        //                 let canonical_val = canonicalize(val);
+        //                 if let Some(then_dest) = then_exprs.get(&canonical_val) {
+        //                     to_hoist.push((
+        //                         canonical_val,
+        //                         *then_dest,
+        //                         *dest,
+        //                         bb.id,
+        //                         *then_bb,
+        //                         *else_bb,
+        //                     ));
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        for (expr, then_dest, else_dest, bb, then_bb, else_bb) in to_hoist {
-            // println!(
-            //     "Hoisting expression {:?} from BBId({}) and BBId({}) to BBId({})",
-            //     expr, then_bb.0, else_bb.0, bb.0
-            // );
-            // create a new value in the parent block
-            let new_dest = builder.allocate_value(then_dest.1, then_dest.2);
-            builder.add_instruction(
-                bb,
-                CfgInstruction::Assign {
-                    dest: new_dest,
-                    val: expr,
-                },
-            );
+        // for (expr, then_dest, else_dest, bb, then_bb, else_bb) in to_hoist {
+        //     // println!(
+        //     //     "Hoisting expression {:?} from BBId({}) and BBId({}) to BBId({})",
+        //     //     expr, then_bb.0, else_bb.0, bb.0
+        //     // );
+        //     // create a new value in the parent block
+        //     let new_dest = builder.allocate_value(then_dest.1, then_dest.2);
+        //     builder.add_instruction(
+        //         bb,
+        //         CfgInstruction::Assign {
+        //             dest: new_dest,
+        //             val: expr,
+        //         },
+        //     );
 
-            // replace uses in then and else blocks
-            builder.replace_value(then_dest, new_dest);
-            builder.replace_value(else_dest, new_dest);
+        //     // replace uses in then and else blocks
+        //     builder.replace_value(then_dest, new_dest);
+        //     builder.replace_value(else_dest, new_dest);
 
-            removed_vals.push(then_dest);
-            removed_vals.push(else_dest);
+        //     removed_vals.push(then_dest);
+        //     removed_vals.push(else_dest);
 
-            changed = true;
-        }
+        //     changed = true;
+        // }
 
         if changed {
             builder.remove_dead_values(&removed_vals);
@@ -1856,6 +1870,11 @@ impl OptPassConfig {
                 OptPass::BlockDedup,
                 OptPass::TailUnification,
                 OptPass::DeadValueElimination,
+                OptPass::TrimDeadBlocks,
+                OptPass::BlockInliner,
+                OptPass::PhiToSelect,
+                OptPass::BlockDedup,
+                OptPass::TailUnification,
                 OptPass::TrimDeadBlocks,
                 OptPass::BlockInliner,
             ],

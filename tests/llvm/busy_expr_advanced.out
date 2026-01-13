@@ -620,7 +620,7 @@ digraph CFG {
 
 }
 
-CFG for function f:
+CFG Debug Dump Before Phi to Select
 bb0: % preds = []
   %0 = param[0] [var a]
   %1 = param[1] [var b]
@@ -631,16 +631,242 @@ bb0: % preds = []
   %64 = sub %0, %1
   br_cond %13 ? bb1 : bb2
 
+
 bb1: % preds = [bb0]
   br bb3
 
+
 bb2: % preds = [bb0]
   br bb3
+
 
 bb3: % preds = [bb1, bb2]
   %45 = Φ(%64@bb1, %4@bb2) [var x]
   %46 = Φ(%7@bb1, %64@bb2) [var y]
   %31 = mul %45, %46
+  %33 = add %31, %10
+  return %33
+
+
+
+CFG Debug Dump After Phi to Select
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %64 = sub %0, %1
+  %65 = select %13, %64, %4 [var x]
+  %66 = select %13, %7, %64 [var y]
+  br_cond %13 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb3
+
+
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %31 = mul %65, %66
+  %33 = add %31, %10
+  return %33
+
+
+
+CFG Graphviz Before and After After Phi to Select:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  br_cond %13 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  br bb3\n"];
+    before_bb1 -> before_bb3;
+    before_bb2 [label="bb2:\n  br bb3\n"];
+    before_bb2 -> before_bb3;
+    before_bb3 [label="bb3:\n  %45 = Φ(%64@bb1, %4@bb2) [var x]\n  %46 = Φ(%7@bb1, %64@bb2) [var y]\n  %31 = mul %45, %46\n  %33 = add %31, %10\n  return %33\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  %65 = select %13, %64, %4 [var x]\n  %66 = select %13, %7, %64 [var y]\n  br_cond %13 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  br bb3\n"];
+    after_bb1 -> after_bb3;
+    after_bb2 [label="bb2:\n  br bb3\n"];
+    after_bb2 -> after_bb3;
+    after_bb3 [label="bb3:\n  %31 = mul %65, %66\n  %33 = add %31, %10\n  return %33\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %64 = sub %0, %1
+  %65 = select %13, %64, %4 [var x]
+  %66 = select %13, %7, %64 [var y]
+  br_cond %13 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb3
+
+
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %31 = mul %65, %66
+  %33 = add %31, %10
+  return %33
+
+
+
+CFG Debug Dump After Block Deduplication
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %64 = sub %0, %1
+  %65 = select %13, %64, %4 [var x]
+  %66 = select %13, %7, %64 [var y]
+  br_cond %13 ? bb1 : bb1
+
+
+bb1: % preds = [bb0]
+  br bb3
+
+
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %31 = mul %65, %66
+  %33 = add %31, %10
+  return %33
+
+
+
+CFG Graphviz Before and After After Block Deduplication:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  %65 = select %13, %64, %4 [var x]\n  %66 = select %13, %7, %64 [var y]\n  br_cond %13 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  br bb3\n"];
+    before_bb1 -> before_bb3;
+    before_bb2 [label="bb2:\n  br bb3\n"];
+    before_bb2 -> before_bb3;
+    before_bb3 [label="bb3:\n  %31 = mul %65, %66\n  %33 = add %31, %10\n  return %33\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  %65 = select %13, %64, %4 [var x]\n  %66 = select %13, %7, %64 [var y]\n  br_cond %13 ? bb1 : bb1\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb1 [color=red];
+    after_bb1 [label="bb1:\n  br bb3\n"];
+    after_bb1 -> after_bb3;
+    after_bb2 [label="bb2:\n  br bb3\n"];
+    after_bb2 -> after_bb3;
+    after_bb3 [label="bb3:\n  %31 = mul %65, %66\n  %33 = add %31, %10\n  return %33\n"];
+  }
+
+}
+
+CFG Debug Dump Before Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %64 = sub %0, %1
+  %65 = select %13, %64, %4 [var x]
+  %66 = select %13, %7, %64 [var y]
+  br bb1
+
+
+bb1: % preds = [bb0]
+  br bb2
+
+
+bb2: % preds = [bb1]
+  %31 = mul %65, %66
+  %33 = add %31, %10
+  return %33
+
+
+
+CFG Debug Dump After Block Inliner
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %64 = sub %0, %1
+  %65 = select %13, %64, %4 [var x]
+  %66 = select %13, %7, %64 [var y]
+  %31 = mul %65, %66
+  %33 = add %31, %10
+  return %33
+
+
+
+CFG Graphviz Before and After After Block Inliner:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  %65 = select %13, %64, %4 [var x]\n  %66 = select %13, %7, %64 [var y]\n  br bb1\n"];
+    before_bb0 -> before_bb1;
+    before_bb1 [label="bb1:\n  br bb2\n"];
+    before_bb1 -> before_bb2;
+    before_bb2 [label="bb2:\n  %31 = mul %65, %66\n  %33 = add %31, %10\n  return %33\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %4 = add %0, %1\n  %7 = mul %0, %1\n  %10 = div %0, %1\n  %13 = lt %0, %1\n  %64 = sub %0, %1\n  %65 = select %13, %64, %4 [var x]\n  %66 = select %13, %7, %64 [var y]\n  %31 = mul %65, %66\n  %33 = add %31, %10\n  return %33\n"];
+  }
+
+}
+
+CFG for function f:
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %4 = add %0, %1
+  %7 = mul %0, %1
+  %10 = div %0, %1
+  %13 = lt %0, %1
+  %64 = sub %0, %1
+  %65 = select %13, %64, %4 [var x]
+  %66 = select %13, %7, %64 [var y]
+  %31 = mul %65, %66
   %33 = add %31, %10
   return %33
 
@@ -656,18 +882,9 @@ bb0:
   %idiv = sdiv i64 %0, %1
   %cmp = icmp slt i64 %0, %1
   %sub = sub i64 %0, %1
-  br i1 %cmp, label %bb1, label %bb2
-
-bb1:                                              ; preds = %bb0
-  br label %bb3
-
-bb2:                                              ; preds = %bb0
-  br label %bb3
-
-bb3:                                              ; preds = %bb2, %bb1
-  %phi = phi i64 [ %sub, %bb1 ], [ %add, %bb2 ]
-  %phi1 = phi i64 [ %mul, %bb1 ], [ %sub, %bb2 ]
-  %mul2 = mul i64 %phi, %phi1
+  %select = select i1 %cmp, i64 %sub, i64 %add
+  %select1 = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %select, %select1
   %add3 = add i64 %mul2, %idiv
   ret i64 %add3
 }
@@ -684,9 +901,9 @@ bb0:
   %idiv = sdiv i64 %0, %1
   %cmp = icmp slt i64 %0, %1
   %sub = sub i64 %0, %1
-  %sub.add = select i1 %cmp, i64 %sub, i64 %add
-  %mul.sub = select i1 %cmp, i64 %mul, i64 %sub
-  %mul2 = mul i64 %sub.add, %mul.sub
+  %select = select i1 %cmp, i64 %sub, i64 %add
+  %select1 = select i1 %cmp, i64 %mul, i64 %sub
+  %mul2 = mul i64 %select, %select1
   %add3 = add i64 %idiv, %mul2
   ret i64 %add3
 }
