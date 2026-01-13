@@ -68,13 +68,13 @@ pub enum Stmt {
     },
     While {
         cond: Spanned<Expr>,
-        body: Box<Spanned<Stmt>>,
+        body: Box<Spanned<Block>>,
     },
     For {
         init: Option<Box<Spanned<Stmt>>>,
         cond: Option<Spanned<Expr>>,
         update: Option<Spanned<Expr>>,
-        body: Box<Spanned<Stmt>>,
+        body: Box<Spanned<Block>>,
     },
     Return(Option<Spanned<Expr>>),
     Break,

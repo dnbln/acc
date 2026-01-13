@@ -373,47 +373,42 @@ Body: Some(
                             },
                         ),
                         body: Spanned {
-                            node: Block(
-                                Spanned {
-                                    node: Block {
-                                        stmts: [
+                            node: Block {
+                                stmts: [
+                                    Spanned {
+                                        node: Expr(
                                             Spanned {
-                                                node: Expr(
-                                                    Spanned {
-                                                        node: BinOp {
-                                                            op: Spanned {
-                                                                node: AddAssign,
-                                                                span: 271..273,
-                                                            },
-                                                            left: Spanned {
-                                                                node: Ident(
-                                                                    RefId(
-                                                                        9,
-                                                                    ),
-                                                                    "result",
-                                                                ),
-                                                                span: 264..270,
-                                                            },
-                                                            right: Spanned {
-                                                                node: Ident(
-                                                                    RefId(
-                                                                        10,
-                                                                    ),
-                                                                    "i",
-                                                                ),
-                                                                span: 274..275,
-                                                            },
-                                                        },
-                                                        span: 264..275,
+                                                node: BinOp {
+                                                    op: Spanned {
+                                                        node: AddAssign,
+                                                        span: 271..273,
                                                     },
-                                                ),
-                                                span: 264..276,
+                                                    left: Spanned {
+                                                        node: Ident(
+                                                            RefId(
+                                                                9,
+                                                            ),
+                                                            "result",
+                                                        ),
+                                                        span: 264..270,
+                                                    },
+                                                    right: Spanned {
+                                                        node: Ident(
+                                                            RefId(
+                                                                10,
+                                                            ),
+                                                            "i",
+                                                        ),
+                                                        span: 274..275,
+                                                    },
+                                                },
+                                                span: 264..275,
                                             },
-                                        ],
+                                        ),
+                                        span: 264..276,
                                     },
-                                    span: 258..280,
-                                },
-                            ),
+                                ],
+                            },
                             span: 258..280,
                         },
                     },

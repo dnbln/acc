@@ -18,14 +18,9 @@ Body: Some(
                             span: 45..46,
                         },
                         body: Spanned {
-                            node: Block(
-                                Spanned {
-                                    node: Block {
-                                        stmts: [],
-                                    },
-                                    span: 48..50,
-                                },
-                            ),
+                            node: Block {
+                                stmts: [],
+                            },
                             span: 48..50,
                         },
                     },

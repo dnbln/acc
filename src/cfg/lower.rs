@@ -402,7 +402,7 @@ fn lower_stmt_to_block(
                 exit_bb,
             };
             // Lower body
-            lower_stmt_to_block(
+            lower_block_to_block(
                 builder,
                 &mut body_bb,
                 Some(loop_refs),
@@ -512,7 +512,7 @@ fn lower_stmt_to_block(
                 exit_bb,
             };
             // Lower body
-            lower_stmt_to_block(
+            lower_block_to_block(
                 builder,
                 &mut body_bb,
                 Some(loop_refs),
