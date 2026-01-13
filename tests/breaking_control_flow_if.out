@@ -1,21 +1,21 @@
 STDOUT:
 CFG for function main:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = const.i64 1
   %10 = const.i64 0
-  br_cond %0 ? BBId(1) : BBId(2)
+  br_cond %0 ? bb1 : bb2
 
-BBId(1): % preds = [BBId(0), BBId(2), BBId(3), BBId(4)]
+bb1: % preds = [bb0, bb2, bb3, bb4]
   return %10
 
-BBId(2): % preds = [BBId(0)]
-  br_cond %0 ? BBId(1) : BBId(3)
+bb2: % preds = [bb0]
+  br_cond %0 ? bb1 : bb3
 
-BBId(3): % preds = [BBId(2)]
-  br_cond %0 ? BBId(4) : BBId(1)
+bb3: % preds = [bb2]
+  br_cond %0 ? bb4 : bb1
 
-BBId(4): % preds = [BBId(3)]
-  br BBId(1)
+bb4: % preds = [bb3]
+  br bb1
 
 
 

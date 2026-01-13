@@ -1,15 +1,15 @@
 STDOUT:
 CFG for function factorial:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = param[0] [var n]
   %2 = const.i64 1
   %3 = leq %0, %2
-  br_cond %3 ? BBId(1) : BBId(2)
+  br_cond %3 ? bb1 : bb2
 
-BBId(1): % preds = [BBId(0)]
+bb1: % preds = [bb0]
   return %2
 
-BBId(2): % preds = [BBId(0)]
+bb2: % preds = [bb0]
   %6 = function v1 [var factorial]
   %9 = sub %0, %2
   %10 = call %6(%9)

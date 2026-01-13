@@ -1,0 +1,143 @@
+STDOUT:
+CFG Debug Dump Before Hoist Pass
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %3 = const.i64 0
+  %4 = const.i64 0
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %11 = const.i64 0
+  %12 = lt %10, %11
+  br_cond %12 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb2
+
+
+bb2: % preds = [bb0, bb1]
+  %40 = Φ(%3@bb0, %7@bb1) [var x]
+  %17 = add %0, %1
+  %18 = const.i64 0
+  %19 = gt %17, %18
+  br_cond %19 ? bb3 : bb4
+
+
+bb3: % preds = [bb2]
+  %22 = add %2, %1
+  %24 = const.i64 2
+  br bb4
+
+
+bb4: % preds = [bb2, bb3]
+  %43 = Φ(%1@bb2, %24@bb3) [var b]
+  %44 = Φ(%4@bb2, %22@bb3) [var y]
+  %28 = add %43, %2
+  return %28
+
+
+
+CFG Debug Dump After Hoist Pass
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %3 = const.i64 0
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %12 = lt %10, %3
+  br_cond %12 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb2
+
+
+bb2: % preds = [bb0, bb1]
+  %40 = Φ(%3@bb0, %7@bb1) [var x]
+  %19 = gt %10, %3
+  br_cond %19 ? bb3 : bb4
+
+
+bb3: % preds = [bb2]
+  %24 = const.i64 2
+  br bb4
+
+
+bb4: % preds = [bb2, bb3]
+  %43 = Φ(%1@bb2, %24@bb3) [var b]
+  %44 = Φ(%3@bb2, %7@bb3) [var y]
+  %28 = add %43, %2
+  return %28
+
+
+
+CFG Graphviz Before and After After Hoist Pass:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %3 = const.i64 0\n  %4 = const.i64 0\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %11 = const.i64 0\n  %12 = lt %10, %11\n  br_cond %12 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  br bb2\n"];
+    before_bb1 -> before_bb2;
+    before_bb2 [label="bb2:\n  %40 = Φ(%3@bb0, %7@bb1) [var x]\n  %17 = add %0, %1\n  %18 = const.i64 0\n  %19 = gt %17, %18\n  br_cond %19 ? bb3 : bb4\n"];
+    before_bb2 -> before_bb3 [color=green];
+    before_bb2 -> before_bb4 [color=red];
+    before_bb3 [label="bb3:\n  %22 = add %2, %1\n  %24 = const.i64 2\n  br bb4\n"];
+    before_bb3 -> before_bb4;
+    before_bb4 [label="bb4:\n  %43 = Φ(%1@bb2, %24@bb3) [var b]\n  %44 = Φ(%4@bb2, %22@bb3) [var y]\n  %28 = add %43, %2\n  return %28\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var c]\n  %3 = const.i64 0\n  %7 = add %1, %2\n  %10 = add %0, %1\n  %12 = lt %10, %3\n  br_cond %12 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  br bb2\n"];
+    after_bb1 -> after_bb2;
+    after_bb2 [label="bb2:\n  %40 = Φ(%3@bb0, %7@bb1) [var x]\n  %19 = gt %10, %3\n  br_cond %19 ? bb3 : bb4\n"];
+    after_bb2 -> after_bb3 [color=green];
+    after_bb2 -> after_bb4 [color=red];
+    after_bb3 [label="bb3:\n  %24 = const.i64 2\n  br bb4\n"];
+    after_bb3 -> after_bb4;
+    after_bb4 [label="bb4:\n  %43 = Φ(%1@bb2, %24@bb3) [var b]\n  %44 = Φ(%3@bb2, %7@bb3) [var y]\n  %28 = add %43, %2\n  return %28\n"];
+  }
+
+}
+
+CFG for function f:
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var c]
+  %3 = const.i64 0
+  %7 = add %1, %2
+  %10 = add %0, %1
+  %12 = lt %10, %3
+  br_cond %12 ? bb1 : bb2
+
+bb1: % preds = [bb0]
+  br bb2
+
+bb2: % preds = [bb0, bb1]
+  %40 = Φ(%3@bb0, %7@bb1) [var x]
+  %19 = gt %10, %3
+  br_cond %19 ? bb3 : bb4
+
+bb3: % preds = [bb2]
+  %24 = const.i64 2
+  br bb4
+
+bb4: % preds = [bb2, bb3]
+  %43 = Φ(%1@bb2, %24@bb3) [var b]
+  %44 = Φ(%3@bb2, %7@bb3) [var y]
+  %28 = add %43, %2
+  return %28
+
+
+
+STDERR:

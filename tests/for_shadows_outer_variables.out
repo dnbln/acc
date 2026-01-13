@@ -1,22 +1,22 @@
 STDOUT:
 CFG for function main:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = const.i64 0
-  br BBId(1)
+  br bb1
 
-BBId(1): % preds = [BBId(0), BBId(2)]
-  %13 = Φ(0@BB0, %10@BB2) [var i]
+bb1: % preds = [bb0, bb2]
+  %13 = Φ(0@bb0, %10@bb2) [var i]
   %3 = const.i64 10
   %4 = lt %13, %3
-  br_cond %4 ? BBId(2) : BBId(3)
+  br_cond %4 ? bb2 : bb3
 
-BBId(2): % preds = [BBId(1)]
+bb2: % preds = [bb1]
   %5 = const.i64 1
   %6 = add %13, %5 [var i]
   %10 = add %6, %5
-  br BBId(1)
+  br bb1
 
-BBId(3): % preds = [BBId(1)]
+bb3: % preds = [bb1]
   return %0
 
 

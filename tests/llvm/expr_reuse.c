@@ -1,4 +1,4 @@
-//@ARGS: --cfg --llvm-ir --llvm-optimized-ir
+//@ARGS: --cfg --llvm-ir --llvm-optimized-ir --opt-debug hp,phi2sel,bd,bi
 int foo(int a, int b, int c){
     int x = 0;
     int y = 0;
@@ -12,5 +12,5 @@ int foo(int a, int b, int c){
         b=2;
     }
     z= b+c;
-    return y;
+    return s + y + z;
 }

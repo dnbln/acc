@@ -1,4 +1,4 @@
-//@ARGS: --cfg --llvm-ir --llvm-optimized-ir
+//@ARGS: --cfg --llvm-ir --llvm-optimized-ir --opt-debug hp,phi2sel,bd,bi
 int factorial(int n) {
   if (n <= 1) {
     return 1;
@@ -6,8 +6,7 @@ int factorial(int n) {
   return n * factorial(n - 1);
 }
 
-int main() {
-  int x = 0;
+int f(int x) {
   int result;
 
   if (x < 10) {
@@ -25,4 +24,8 @@ int main() {
   } else {
     return factorial(result);
   }
+}
+
+int main() {
+  return f(5);
 }

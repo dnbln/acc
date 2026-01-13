@@ -503,7 +503,7 @@ impl Parser {
         }
         self.expect(TokenKind::RParen)?;
 
-        let body = Box::new(self.parse_stmt()?);
+        let body = Box::new(self.parse_block()?);
 
         let span = self.span_from(start);
         Ok(Spanned::new(Stmt::While { cond, body }, span))
@@ -550,7 +550,7 @@ impl Parser {
         }
         self.expect(TokenKind::RParen)?;
 
-        let body = Box::new(self.parse_stmt()?);
+        let body = Box::new(self.parse_block()?);
 
         let span = self.span_from(start);
         Ok(Spanned::new(

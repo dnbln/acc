@@ -1,0 +1,107 @@
+STDOUT:
+CFG Debug Dump Before Hoist Pass
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var t]
+  %3 = param[3] [var u]
+  %6 = add %0, %1
+  %9 = mul %0, %1
+  %12 = lt %2, %3
+  br_cond %12 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  %15 = sub %0, %1
+  br bb3
+
+
+bb2: % preds = [bb0]
+  %19 = sub %0, %1
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %38 = Φ(%15@bb1, %6@bb2) [var x]
+  %39 = Φ(%9@bb1, %19@bb2) [var y]
+  %23 = mul %38, %39
+  return %23
+
+
+
+CFG Debug Dump After Hoist Pass
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var t]
+  %3 = param[3] [var u]
+  %6 = add %0, %1
+  %9 = mul %0, %1
+  %12 = lt %2, %3
+  %44 = sub %0, %1
+  br_cond %12 ? bb1 : bb2
+
+
+bb1: % preds = [bb0]
+  br bb3
+
+
+bb2: % preds = [bb0]
+  br bb3
+
+
+bb3: % preds = [bb1, bb2]
+  %38 = Φ(%44@bb1, %6@bb2) [var x]
+  %39 = Φ(%9@bb1, %44@bb2) [var y]
+  %23 = mul %38, %39
+  return %23
+
+
+
+CFG Graphviz Before and After After Hoist Pass:
+digraph CFG {
+  node [shape=box, fontname="Courier New", fontsize=10];
+  edge [fontname="Courier New", fontsize=9];
+
+  subgraph cluster_before {
+    before_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var t]\n  %3 = param[3] [var u]\n  %6 = add %0, %1\n  %9 = mul %0, %1\n  %12 = lt %2, %3\n  br_cond %12 ? bb1 : bb2\n"];
+    before_bb0 -> before_bb1 [color=green];
+    before_bb0 -> before_bb2 [color=red];
+    before_bb1 [label="bb1:\n  %15 = sub %0, %1\n  br bb3\n"];
+    before_bb1 -> before_bb3;
+    before_bb2 [label="bb2:\n  %19 = sub %0, %1\n  br bb3\n"];
+    before_bb2 -> before_bb3;
+    before_bb3 [label="bb3:\n  %38 = Φ(%15@bb1, %6@bb2) [var x]\n  %39 = Φ(%9@bb1, %19@bb2) [var y]\n  %23 = mul %38, %39\n  return %23\n"];
+  }
+
+  subgraph cluster_after {
+    after_bb0 [label="bb0:\n  %0 = param[0] [var a]\n  %1 = param[1] [var b]\n  %2 = param[2] [var t]\n  %3 = param[3] [var u]\n  %6 = add %0, %1\n  %9 = mul %0, %1\n  %12 = lt %2, %3\n  %44 = sub %0, %1\n  br_cond %12 ? bb1 : bb2\n"];
+    after_bb0 -> after_bb1 [color=green];
+    after_bb0 -> after_bb2 [color=red];
+    after_bb1 [label="bb1:\n  br bb3\n"];
+    after_bb1 -> after_bb3;
+    after_bb2 [label="bb2:\n  br bb3\n"];
+    after_bb2 -> after_bb3;
+    after_bb3 [label="bb3:\n  %38 = Φ(%44@bb1, %6@bb2) [var x]\n  %39 = Φ(%9@bb1, %44@bb2) [var y]\n  %23 = mul %38, %39\n  return %23\n"];
+  }
+
+}
+
+CFG for function foo:
+bb0: % preds = []
+  %0 = param[0] [var a]
+  %1 = param[1] [var b]
+  %2 = param[2] [var t]
+  %3 = param[3] [var u]
+  %6 = add %0, %1
+  %9 = mul %0, %1
+  %12 = lt %2, %3
+  %44 = sub %0, %1
+  %45 = select %12, %44, %6 [var x]
+  %46 = select %12, %9, %44 [var y]
+  %23 = mul %45, %46
+  return %23
+
+
+
+STDERR:

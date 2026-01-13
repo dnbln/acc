@@ -49,6 +49,7 @@ use crate::{
         builder::{CfgBuilder, ValidateError},
         cleanup::{OptPassConfig, cleanup_passes},
         def::*,
+        display,
         sema::SemaResults,
     },
     diagnostics::{IntoDiagnostic, SemanticsAwareIntoDiagnostic},
@@ -69,6 +70,7 @@ pub enum SemanticError {
 #[derive(Debug)]
 pub enum CfgWarning {
     UnreachableCode(Span),
+    UnusedValue(Span),
 }
 
 impl IntoDiagnostic for CfgWarning {
@@ -82,6 +84,12 @@ impl IntoDiagnostic for CfgWarning {
                             .with_message("this code is unreachable"),
                     ])
             }
+            CfgWarning::UnusedValue(span) => codespan_reporting::diagnostic::Diagnostic::warning()
+                .with_message("unused value")
+                .with_labels(vec![
+                    codespan_reporting::diagnostic::Label::primary(file_id, span.range())
+                        .with_message("this value is computed but never used"),
+                ]),
         }
     }
 }
@@ -159,7 +167,9 @@ pub fn lower_ast_to_cfg(
         return Err(LowerError::MalformedPhiInfo(malformed));
     }
 
-    cleanup_passes(&mut builder, pass_config);
+    cleanup_passes(&mut builder, sema, pass_config);
+
+    warnings.extend(std::mem::take(&mut builder.cfg_warnings));
 
     match builder.build(entry) {
         Ok(cfg) => Ok(cfg),
@@ -269,7 +279,8 @@ fn lower_stmt_to_block(
             //                                 exit_bb
             //                                    |
             //                             (continuation)
-            let mut then_bb = builder.create_bb();
+            let init_then_bb = builder.create_bb();
+            let mut then_bb = init_then_bb;
 
             let cond_val = lower_expr(builder, bb_id, cond, sema, semantic_errors);
 
@@ -285,7 +296,8 @@ fn lower_stmt_to_block(
             );
             // Lower else branch
             if let Some(else_branch) = else_branch {
-                let mut else_bb = builder.create_bb();
+                let init_else_bb = builder.create_bb();
+                let mut else_bb = init_else_bb;
                 lower_block_to_block(
                     builder,
                     &mut else_bb,
@@ -307,8 +319,8 @@ fn lower_stmt_to_block(
                     *bb_id,
                     TailCfgInstruction::CondBranch {
                         cond: cond_val,
-                        then_bb,
-                        else_bb,
+                        then_bb: init_then_bb,
+                        else_bb: init_else_bb,
                     },
                 );
 
@@ -325,7 +337,7 @@ fn lower_stmt_to_block(
                     *bb_id,
                     TailCfgInstruction::CondBranch {
                         cond: cond_val,
-                        then_bb,
+                        then_bb: init_then_bb,
                         else_bb: exit_bb,
                     },
                 );
@@ -365,29 +377,32 @@ fn lower_stmt_to_block(
             //                                         |                              |
             //                                  br entry_bb -->------------------------
 
-            let mut entry = builder.create_bb();
-            let mut body_bb = builder.create_bb();
+            let init_entry = builder.create_bb();
+            let mut entry = init_entry;
 
             builder
                 .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: entry });
 
             let cond_val = lower_expr(builder, &mut entry, cond, sema, semantic_errors);
 
+            let init_body_bb = builder.create_bb();
+            let mut body_bb = init_body_bb;
+
             let exit_bb = builder.create_bb();
             builder.set_tail_instruction(
                 entry,
                 TailCfgInstruction::CondBranch {
                     cond: cond_val,
-                    then_bb: body_bb,
+                    then_bb: init_body_bb,
                     else_bb: exit_bb,
                 },
             );
             let loop_refs = ControlFlowLoopRefs {
-                continue_bb: entry,
+                continue_bb: init_entry,
                 exit_bb,
             };
             // Lower body
-            lower_stmt_to_block(
+            lower_block_to_block(
                 builder,
                 &mut body_bb,
                 Some(loop_refs),
@@ -399,7 +414,7 @@ fn lower_stmt_to_block(
             if !builder.bb_has_tail(body_bb) {
                 builder.set_tail_instruction(
                     body_bb,
-                    TailCfgInstruction::UncondBranch { target: entry },
+                    TailCfgInstruction::UncondBranch { target: init_entry },
                 );
             }
             *bb_id = exit_bb;
@@ -457,13 +472,18 @@ fn lower_stmt_to_block(
                 );
             }
 
-            let mut entry = builder.create_bb();
-            let mut body_bb = builder.create_bb();
-            let mut update_bb = builder.create_bb();
+            let init_entry = builder.create_bb();
+            let mut entry = init_entry;
+            let init_body_bb = builder.create_bb();
+            let mut body_bb = init_body_bb;
+            let init_update_bb = builder.create_bb();
+            let mut update_bb = init_update_bb;
             let exit_bb = builder.create_bb();
 
-            builder
-                .set_tail_instruction(*bb_id, TailCfgInstruction::UncondBranch { target: entry });
+            builder.set_tail_instruction(
+                *bb_id,
+                TailCfgInstruction::UncondBranch { target: init_entry },
+            );
 
             match cond {
                 Some(cond_expr) => {
@@ -473,7 +493,7 @@ fn lower_stmt_to_block(
                         entry,
                         TailCfgInstruction::CondBranch {
                             cond: cond_val,
-                            then_bb: body_bb,
+                            then_bb: init_body_bb,
                             else_bb: exit_bb,
                         },
                     );
@@ -481,16 +501,18 @@ fn lower_stmt_to_block(
                 None => {
                     builder.set_tail_instruction(
                         entry,
-                        TailCfgInstruction::UncondBranch { target: body_bb },
+                        TailCfgInstruction::UncondBranch {
+                            target: init_body_bb,
+                        },
                     );
                 }
             }
             let loop_refs = ControlFlowLoopRefs {
-                continue_bb: update_bb,
+                continue_bb: init_update_bb,
                 exit_bb,
             };
             // Lower body
-            lower_stmt_to_block(
+            lower_block_to_block(
                 builder,
                 &mut body_bb,
                 Some(loop_refs),
@@ -503,7 +525,9 @@ fn lower_stmt_to_block(
             if !builder.bb_has_tail(body_bb) {
                 builder.set_tail_instruction(
                     body_bb,
-                    TailCfgInstruction::UncondBranch { target: update_bb },
+                    TailCfgInstruction::UncondBranch {
+                        target: init_update_bb,
+                    },
                 );
             }
             if let Some(update_expr) = update {
@@ -511,7 +535,7 @@ fn lower_stmt_to_block(
             }
             builder.set_tail_instruction(
                 update_bb,
-                TailCfgInstruction::UncondBranch { target: entry },
+                TailCfgInstruction::UncondBranch { target: init_entry },
             );
             *bb_id = exit_bb;
         }
@@ -1529,19 +1553,18 @@ impl MalformedPhiInfo {
     pub fn display_in_graphviz(&self, sema: &SemaResults) -> String {
         let mut output = String::new();
         output.push_str("digraph MalformedPhiInfo {\n");
-        output.push_str("  node [shape=box, fontname=\"Courier New\", fontsize=10];\n");
-        output.push_str("  edge [fontname=\"Courier New\", fontsize=9];\n");
+        output.push_str(display::GRAPHVIZ_HEADER);
 
         let mut edges_missing_vars: BTreeMap<(BBId, BBId), BTreeSet<VarId>> = BTreeMap::new();
 
         for block in &self.blocks {
-            let mut s = format!("BB{}:\n", block.id.0);
+            let mut s = format!("{}:\n", block.id);
 
             for phi in &block.phi {
                 let sources_str = phi
                     .sources
                     .iter()
-                    .map(|(bb_id, val)| format!("{val}@BB{}", bb_id.0))
+                    .map(|(bb_id, val)| format!("{val}@{}", bb_id))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(&mut s, "    {} = Φ({}", phi.dest, sources_str).unwrap();
@@ -1563,7 +1586,6 @@ impl MalformedPhiInfo {
                             info.missing_sources
                                 .iter()
                                 .filter(|it| block.predecessors.contains(it))
-                                .map(|bb| bb.0)
                                 .collect::<Vec<_>>()
                         )
                         .unwrap();
@@ -1605,7 +1627,6 @@ impl MalformedPhiInfo {
                                         .iter()
                                         .filter(|it| block.predecessors.contains(it)
                                             || it == &&block.id)
-                                        .map(|bb| bb.0)
                                         .collect::<Vec<_>>()
                                 )
                                 .unwrap();
@@ -1623,22 +1644,17 @@ impl MalformedPhiInfo {
 
             match &block.tail {
                 TailCfgInstruction::UncondBranch { target } => {
-                    writeln!(&mut s, "    br BB{}", target.0).unwrap();
+                    writeln!(&mut s, "    br {}", target).unwrap();
                 }
                 TailCfgInstruction::CondBranch {
                     cond,
                     then_bb,
                     else_bb,
                 } => {
-                    writeln!(
-                        &mut s,
-                        "    br_cond {} ? BB{} : BB{};",
-                        cond, then_bb.0, else_bb.0
-                    )
-                    .unwrap();
+                    writeln!(&mut s, "    br_cond {cond} ? {then_bb} : {else_bb}").unwrap();
                 }
                 TailCfgInstruction::Return { value: Some(value) } => {
-                    writeln!(&mut s, "    return {}", value).unwrap();
+                    writeln!(&mut s, "    return {value}").unwrap();
                 }
                 TailCfgInstruction::Return { value: None } => {
                     writeln!(&mut s, "    return").unwrap();
@@ -1648,7 +1664,7 @@ impl MalformedPhiInfo {
                 }
             }
 
-            writeln!(&mut output, "  BB{} [label={s:?}];", block.id.0).unwrap();
+            writeln!(&mut output, "  {} [label={s:?}];", block.id).unwrap();
         }
 
         fn get_missing_vars_label(
@@ -1679,10 +1695,9 @@ impl MalformedPhiInfo {
                     let missing_vars_extra =
                         get_missing_vars_label(&edges_missing_vars, block.id, *target, sema);
                     if let Some(extra) = missing_vars_extra {
-                        writeln!(output, "  BB{} -> BB{} [{}];", block.id.0, target.0, extra)
-                            .unwrap();
+                        writeln!(output, "  {} -> {} [{}];", block.id, target, extra).unwrap();
                     } else {
-                        writeln!(output, "  BB{} -> BB{};", block.id.0, target.0).unwrap();
+                        writeln!(output, "  {} -> {};", block.id, target).unwrap();
                     }
                 }
 
@@ -1695,30 +1710,24 @@ impl MalformedPhiInfo {
                     if let Some(extra) = missing_vars_then {
                         writeln!(
                             output,
-                            "  BB{} -> BB{} [color=green,{}];",
-                            block.id.0, then_bb.0, extra
+                            "  {} -> {} [color=green,{}];",
+                            block.id, then_bb, extra
                         )
                         .unwrap();
                     } else {
-                        writeln!(
-                            output,
-                            "  BB{} -> BB{} [color=green];",
-                            block.id.0, then_bb.0
-                        )
-                        .unwrap();
+                        writeln!(output, "  {} -> {} [color=green];", block.id, then_bb).unwrap();
                     }
                     let missing_vars_else =
                         get_missing_vars_label(&edges_missing_vars, block.id, *else_bb, sema);
                     if let Some(extra) = missing_vars_else {
                         writeln!(
                             output,
-                            "  BB{} -> BB{} [color=red,{}];",
-                            block.id.0, else_bb.0, extra
+                            "  {} -> {} [color=red,{}];",
+                            block.id, else_bb, extra
                         )
                         .unwrap();
                     } else {
-                        writeln!(output, "  BB{} -> BB{} [color=red];", block.id.0, else_bb.0)
-                            .unwrap();
+                        writeln!(output, "  {} -> {} [color=red];", block.id, else_bb).unwrap();
                     }
                 }
                 TailCfgInstruction::Return { .. } | TailCfgInstruction::Undefined => {}

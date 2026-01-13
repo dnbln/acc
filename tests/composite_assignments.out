@@ -1,6 +1,6 @@
 STDOUT:
 CFG for function main:
-BBId(0): % preds = []
+bb0: % preds = []
   %0 = const.i64 1
   %23 = const.i64 10 [var x]
   %24 = const.i64 20 [var x]

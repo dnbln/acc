@@ -18,7 +18,7 @@ libtest-mimic = "0.5.0"
 
 [features]
 default = [
-    "llvm-backend"
+    # "llvm-backend"
 ]
 llvm-backend = ["dep:llvm-sys", "llvm-sys/force-static", "dep:libc"]
 
@@ -27,6 +27,10 @@ name = "tests"
 path = "src/test_harness.rs"
 harness = false
 
+[[test]]
+name = "demo-tests"
+path = "src/test_harness_demo.rs"
+harness = false
 
 [[test]]
 name = "llvm-tests"
