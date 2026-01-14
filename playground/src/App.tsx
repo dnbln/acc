@@ -516,9 +516,11 @@ export function App() {
             getOptionLabel={option => option.value}
             getOptionValue={option => option.value}
             formatOptionLabel={(option, { context }) =>
-              context === "menu"
-                ? `${option.value} — ${option.description}`
-                : option.value
+              context === "menu" ? (
+                <span title={option.description}>{option.value}</span>
+              ) : (
+                <span title={option.description}>{option.value}</span>
+              )
             }
             styles={{
               control: base => ({

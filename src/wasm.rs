@@ -10,7 +10,7 @@ use crate::cfg::{
 };
 use crate::parser::ast::Program;
 use crate::parser::error::{ParseError, ParseErrorKind};
-use crate::parser::Parser as CParser;
+use crate::parser::{Parser as CParser, TopLevel};
 use crate::parser::span::Span;
 
 const GRAPHVIZ_HEADER: &str = r#"  node [shape=box, fontname="Courier New", fontsize=10];
