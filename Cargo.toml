@@ -4,6 +4,9 @@ description = "Academic C Compiler"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.53", features = ["derive"] }
@@ -12,6 +15,9 @@ logos = "0.15.1"
 thiserror = "2.0"
 llvm-sys = { version = "211.0.0", default-features = false, optional = true }
 libc = { version = "0.2.178", optional = true }
+wasm-bindgen = { version = "0.2.100", optional = true }
+serde = { version = "1.0.219", features = ["derive"], optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
 
 [dev-dependencies]
 libtest-mimic = "0.5.0"
@@ -21,6 +27,7 @@ default = [
     # "llvm-backend"
 ]
 llvm-backend = ["dep:llvm-sys", "llvm-sys/force-static", "dep:libc"]
+wasm = ["dep:wasm-bindgen", "dep:serde", "dep:serde-wasm-bindgen"]
 
 [[test]]
 name = "tests"

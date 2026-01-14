@@ -1,3 +1,4 @@
 /target
 /.direnv
 *.dot
+/playground/src/wasm

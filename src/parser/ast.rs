@@ -4,6 +4,10 @@ use crate::parser::{operator::{BinaryOp, UnaryOp}, span::Span};
 
 use super::span::Spanned;
 
+#[cfg(feature = "wasm")]
+use serde::Serialize;
+
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Type {
@@ -13,9 +17,12 @@ pub enum Type {
     Bool,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
+#[cfg_attr(feature = "wasm", serde(transparent))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RefId(pub(super) usize);
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Expr {
@@ -42,6 +49,8 @@ pub enum Expr {
     },
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
+#[cfg_attr(feature = "wasm", serde(transparent))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VarId(pub(super) usize);
 
@@ -51,11 +60,13 @@ impl fmt::Display for VarId {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Spanned<Stmt>>,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Stmt {
@@ -87,6 +98,7 @@ pub enum Stmt {
     },
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Function {
@@ -96,6 +108,7 @@ pub struct Function {
     pub body: Option<Spanned<Block>>,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum TopLevel {
@@ -109,6 +122,7 @@ pub enum TopLevel {
     },
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 pub struct Program {
     pub items: Vec<Spanned<TopLevel>>,

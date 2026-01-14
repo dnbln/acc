@@ -35,3 +35,27 @@ cargo test --features llvm-backend
 ```
 
 To run the LLVM backend tests as well.
+
+## WebAssembly build (AST/CFG/Graphviz)
+
+The wasm bindings are behind the `wasm` feature and expose:
+- `parse(source: &str) -> String`
+- `compile(source: &str, opts: Vec<String>, dve_emit_warnings: bool) -> JsValue`
+
+`opts` accepts the same pass names as the CLI `--opt` flag: `full`, `none`, `cp`, `dve`,
+`cpdvetdb`, `bi`, `hp`, `ps`, `vi`, `vips`, `phi2sel`, `bd`, `tu`, `tdb`.
+
+`compile` returns a structured object:
+`{ ok, cfg_text, graphviz, errors: [{ range, error_name, severity }], warnings: [{ range, error_name, severity }] }`.
+
+Build with:
+
+```sh
+cargo build --target wasm32-unknown-unknown --features wasm --lib
+```
+
+If you see missing target errors, install it first:
+
+```sh
+rustup target add wasm32-unknown-unknown
+```
