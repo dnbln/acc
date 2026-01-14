@@ -38,7 +38,7 @@ type ViewOption = {
 function IRView({ cfgText }: { cfgText: string | null }) {
   return (
     <pre className="h-full overflow-auto whitespace-pre-wrap p-4 font-mono text-sm text-slate-200">
-      {cfgText ?? "CFG_TEXT"}
+      {cfgText}
     </pre>
   );
 }
@@ -428,21 +428,63 @@ export function App() {
   );
 
   const optimizationOptions = useMemo(
-    () =>
-      [
-        "cp",
-        "dve",
-        "cpdvetdb",
-        "bi",
-        "hp",
-        "ps",
-        "vi",
-        "vips",
-        "phi2sel",
-        "bd",
-        "tu",
-        "tdb",
-      ].map(value => ({ value, label: value })),
+    () => [
+      {
+        value: "cp",
+        description: "constant propagation; folds constants and propagates constant values through the CFG.",
+      },
+      {
+        value: "dve",
+        description: "dead value elimination; removes assignments to values that are not live.",
+      },
+      {
+        value: "cpdvetdb",
+        description:
+          "loop of constant propagation, dead value elimination, and trim-dead-blocks until no changes.",
+      },
+      {
+        value: "bi",
+        description:
+          "block inliner; inlines a block into its predecessor when it has a single predecessor (and a few structured branch cases).",
+      },
+      {
+        value: "hp",
+        description:
+          "hoist pass; hoists repeated pure expressions to a common dominating block when safe.",
+      },
+      {
+        value: "ps",
+        description: "phi simplification; replaces phi nodes with identical sources by simple assignments.",
+      },
+      {
+        value: "vi",
+        description:
+          "value inliner; replaces uses of values assigned from other values, chasing equality chains.",
+      },
+      {
+        value: "vips",
+        description: "loop of phi simplification and value inliner until no changes.",
+      },
+      {
+        value: "phi2sel",
+        description:
+          "converts certain two-predecessor phi nodes into a select instruction under a matching branch pattern.",
+      },
+      {
+        value: "bd",
+        description:
+          "block deduplication; merges empty blocks with identical tails (when safe with phi nodes).",
+      },
+      {
+        value: "tu",
+        description:
+          "tail unification; replaces conditional branches that go to the same target with an unconditional branch.",
+      },
+      {
+        value: "tdb",
+        description: "trim dead blocks; removes unreachable blocks and relinks the CFG.",
+      },
+    ],
     []
   );
 
@@ -456,115 +498,143 @@ export function App() {
 
   return (
     <div className="h-screen w-screen bg-[#0f1115] text-slate-100">
+      <div className="flex flex-wrap items-center gap-4 border-b border-white/10 bg-[#0b0d11] px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+        <div className="mr-auto text-sm tracking-[0.3em] text-slate-200">
+          Compiler Explorer
+        </div>
+        <div className="min-w-[320px] flex-1 max-w-[640px]">
+          <Select
+            classNamePrefix="cm-select"
+            options={optimizationOptions}
+            value={selectedOptimizations}
+            placeholder="Optimizations"
+            onChange={options =>
+              setOptimizations((options ?? []).map(option => option.value))
+            }
+            isMulti
+            closeMenuOnSelect={false}
+            getOptionLabel={option => option.value}
+            getOptionValue={option => option.value}
+            formatOptionLabel={(option, { context }) =>
+              context === "menu"
+                ? `${option.value} — ${option.description}`
+                : option.value
+            }
+            styles={{
+              control: base => ({
+                ...base,
+                backgroundColor: "transparent",
+                border: "1px solid rgba(148, 163, 184, 0.2)",
+                minHeight: 36,
+                boxShadow: "none",
+              }),
+              indicatorsContainer: base => ({
+                ...base,
+                height: 36,
+              }),
+              input: base => ({
+                ...base,
+                margin: 0,
+                padding: 0,
+              }),
+              menu: base => ({
+                ...base,
+                backgroundColor: "#0f1115",
+                border: "1px solid rgba(148, 163, 184, 0.2)",
+              }),
+              multiValue: base => ({
+                ...base,
+                backgroundColor: "rgba(148, 163, 184, 0.2)",
+                marginRight: 6,
+              }),
+              multiValueLabel: base => ({
+                ...base,
+                color: "#e2e8f0",
+                letterSpacing: "0.2em",
+              }),
+              option: (base, state) => ({
+                ...base,
+                backgroundColor: state.isFocused ? "#1f2937" : "transparent",
+                color: state.isDisabled ? "#475569" : "#e2e8f0",
+                cursor: state.isDisabled ? "not-allowed" : "pointer",
+                letterSpacing: "0.2em",
+              }),
+              indicatorSeparator: base => ({ ...base, display: "none" }),
+              dropdownIndicator: base => ({
+                ...base,
+                color: "#94a3b8",
+                padding: "0 8px",
+              }),
+            }}
+          />
+        </div>
+      </div>
       <SplitPane
         split="vertical"
         sizes={sizes}
         onChange={setSizes}
         minSize={240}
-        className="h-full"
+        className="h-[calc(100%-60px)]"
       >
         <div className="h-full border-r border-white/10 bg-[#0b0d11]">
-          <div className="flex flex-col gap-2 border-b border-white/10 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <div>
-                <div className="mb-1">Example</div>
-                <Select
-                  classNamePrefix="cm-select"
-                  options={exampleOptions}
-                  value={selectedExample}
-                  onChange={option => {
-                    if (!option) return;
-                    setSelectedExampleId(option.value);
-                    const example = examples.find(item => item.id === option.value);
-                    if (example) {
-                      setCode(example.code);
-                      setOptimizations(example.optimizations);
-                    }
-                  }}
-                  isSearchable={false}
-                  styles={{
-                    control: base => ({
-                      ...base,
-                      backgroundColor: "transparent",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      minHeight: 30,
-                      boxShadow: "none",
-                    }),
-                    menu: base => ({
-                      ...base,
-                      backgroundColor: "#0f1115",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                    }),
-                    singleValue: base => ({
-                      ...base,
-                      color: "#cbd5f5",
-                      letterSpacing: "0.2em",
-                    }),
-                    option: (base, state) => ({
-                      ...base,
-                      backgroundColor: state.isFocused ? "#1f2937" : "transparent",
-                      color: state.isDisabled ? "#475569" : "#e2e8f0",
-                      cursor: state.isDisabled ? "not-allowed" : "pointer",
-                      letterSpacing: "0.2em",
-                    }),
-                    indicatorSeparator: base => ({ ...base, display: "none" }),
-                    dropdownIndicator: base => ({
-                      ...base,
-                      color: "#94a3b8",
-                      padding: "0 8px",
-                    }),
-                  }}
-                />
-              </div>
-              <div>
-                <div className="mb-1">Optimizations</div>
-                <Select
-                  classNamePrefix="cm-select"
-                  options={optimizationOptions}
-                  value={selectedOptimizations}
-                  onChange={options =>
-                    setOptimizations((options ?? []).map(option => option.value))
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-400 min-w-[540px]">
+            <div>Editor</div>
+            <div className="min-w-[220px]">
+              <Select
+                classNamePrefix="cm-select"
+                options={exampleOptions}
+                value={selectedExample}
+                onChange={option => {
+                  if (!option) return;
+                  setSelectedExampleId(option.value);
+                  const example = examples.find(item => item.id === option.value);
+                  if (example) {
+                    setCode(example.code);
+                    setOptimizations(example.optimizations);
                   }
-                  isMulti
-                  closeMenuOnSelect={false}
-                  styles={{
-                    control: base => ({
-                      ...base,
-                      backgroundColor: "transparent",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      minHeight: 30,
-                      boxShadow: "none",
-                    }),
-                    menu: base => ({
-                      ...base,
-                      backgroundColor: "#0f1115",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                    }),
-                    multiValue: base => ({
-                      ...base,
-                      backgroundColor: "rgba(148, 163, 184, 0.2)",
-                    }),
-                    multiValueLabel: base => ({
-                      ...base,
-                      color: "#e2e8f0",
-                      letterSpacing: "0.2em",
-                    }),
-                    option: (base, state) => ({
-                      ...base,
-                      backgroundColor: state.isFocused ? "#1f2937" : "transparent",
-                      color: state.isDisabled ? "#475569" : "#e2e8f0",
-                      cursor: state.isDisabled ? "not-allowed" : "pointer",
-                      letterSpacing: "0.2em",
-                    }),
-                    indicatorSeparator: base => ({ ...base, display: "none" }),
-                    dropdownIndicator: base => ({
-                      ...base,
-                      color: "#94a3b8",
-                      padding: "0 8px",
-                    }),
-                  }}
-                />
-              </div>
+                }}
+                isSearchable={false}
+                styles={{
+                  control: base => ({
+                    ...base,
+                    backgroundColor: "transparent",
+                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    minHeight: 30,
+                    boxShadow: "none",
+                  }),
+                  indicatorsContainer: base => ({
+                    ...base,
+                  }),
+                  input: base => ({
+                    ...base,
+                    margin: 0,
+                    padding: 0,
+                  }),
+                  menu: base => ({
+                    ...base,
+                    backgroundColor: "#0f1115",
+                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                  }),
+                  singleValue: base => ({
+                    ...base,
+                    color: "#cbd5f5",
+                    letterSpacing: "0.2em",
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isFocused ? "#1f2937" : "transparent",
+                    color: state.isDisabled ? "#475569" : "#e2e8f0",
+                    cursor: state.isDisabled ? "not-allowed" : "pointer",
+                    letterSpacing: "0.2em",
+                  }),
+                  indicatorSeparator: base => ({ ...base, display: "none" }),
+                  dropdownIndicator: base => ({
+                    ...base,
+                    color: "#94a3b8",
+                    padding: "0 8px",
+                  }),
+                }}
+              />
             </div>
           </div>
           <CodeMirror

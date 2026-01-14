@@ -34,6 +34,23 @@ Rules:
 - Use only one of `full` or `none` or an explicit list of pass names.
 - `dveEmitWarnings` toggles warnings from the Dead Value Elimination pass.
 
+## Optimization options
+
+- `full`: predefined pipeline from `OptPassConfig::full` (order: `vips, cpdvetdb, bi, hp, vips, phi2sel, bd, tu, dve, tdb, bi, phi2sel, bd, tu, tdb, bi`).
+- `none`: run no optimization passes.
+- `cp`: constant propagation; folds constants and propagates constant values through the CFG.
+- `dve`: dead value elimination; removes assignments to values that are not live.
+- `cpdvetdb`: loop of constant propagation, dead value elimination, and trim-dead-blocks until no changes.
+- `bi`: block inliner; inlines a block into its predecessor when it has a single predecessor (and a few structured branch cases).
+- `hp`: hoist pass; hoists repeated pure expressions to a common dominating block when safe.
+- `ps`: phi simplification; replaces phi nodes with identical sources by simple assignments.
+- `vi`: value inliner; replaces uses of values assigned from other values, chasing equality chains.
+- `vips`: loop of phi simplification and value inliner until no changes.
+- `phi2sel`: converts certain two-predecessor phi nodes into a `select` instruction under a matching branch pattern.
+- `bd`: block deduplication; merges empty blocks with identical tails (when safe with phi nodes).
+- `tu`: tail unification; replaces conditional branches that go to the same target with an unconditional branch.
+- `tdb`: trim dead blocks; removes unreachable blocks and relinks the CFG.
+
 ## Return shape
 
 ```ts
