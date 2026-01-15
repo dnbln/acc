@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+#[cfg(feature = "wasm")]
+use serde::Serialize;
 #[derive(Clone)]
 pub enum Assoc {
     Left,
@@ -146,6 +148,7 @@ pub fn c_operators() -> OpConfig {
         .postfix("--", 90)
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     Plus,
@@ -156,6 +159,7 @@ pub enum UnaryOp {
     Decrement,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,

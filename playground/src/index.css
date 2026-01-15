@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    @apply text-[rgba(255,255,255,0.87)] bg-[#0f1115] font-sans;
+  }
+
+  body {
+    @apply min-w-[320px] min-h-screen m-0;
+  }
+
+  #root {
+    @apply h-screen w-screen;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion) {
+  *,
+  ::before,
+  ::after {
+    animation: none !important;
+  }
+}
+
+.cm-lintRange {
+  background: rgba(248, 113, 113, 0.18);
+}
+
+.cm-lintRange-warning {
+  background: rgba(251, 191, 36, 0.18);
+}
+
+.cm-lintPoint::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f87171;
+}
+
+.cm-lintPoint-warning::after {
+  background: #fbbf24;
+}
+
+.cm-diagnostic {
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.graphviz-view svg {
+  background: transparent;
+}
+
+.graphviz-view text {
+  fill: #e2e8f0;
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
+.graphviz-view path,
+.graphviz-view line,
+.graphviz-view polygon {
+  stroke: rgba(148, 163, 184, 0.7);
+}
+
+.graphviz-view polygon {
+  fill: rgba(15, 17, 21, 0.6);
+}

@@ -1,5 +1,9 @@
 use std::{fmt, ops::Deref};
 
+#[cfg(feature = "wasm")]
+use serde::Serialize;
+
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Span {
     pub start: usize,
@@ -22,6 +26,7 @@ impl fmt::Debug for Span {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Clone)]
 pub struct Spanned<T> {
     pub node: T,
