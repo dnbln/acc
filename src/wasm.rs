@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 
-use wasm_bindgen::prelude::*;
 use serde::Serialize;
+use wasm_bindgen::prelude::*;
 
 use crate::cfg::{
     OptPass, OptPassConfig, display,
@@ -10,8 +10,8 @@ use crate::cfg::{
 };
 use crate::parser::ast::Program;
 use crate::parser::error::{ParseError, ParseErrorKind};
-use crate::parser::{Parser as CParser, TopLevel};
 use crate::parser::span::Span;
+use crate::parser::{Parser as CParser, TopLevel};
 
 const GRAPHVIZ_HEADER: &str = r#"  node [shape=box, fontname="Courier New", fontsize=10];
   edge [fontname="Courier New", fontsize=9];
@@ -145,7 +145,13 @@ fn lower_cfgs(
     program: &Program,
     sema: &sema::SemaResults,
     opt_config: &OptPassConfig,
-) -> Result<(Vec<(String, crate::cfg::def::ControlFlowGraph)>, Vec<CfgWarning>), LowerError> {
+) -> Result<
+    (
+        Vec<(String, crate::cfg::def::ControlFlowGraph)>,
+        Vec<CfgWarning>,
+    ),
+    LowerError,
+> {
     let mut warnings = Vec::new();
     let mut cfgs = Vec::new();
 
@@ -168,11 +174,7 @@ fn sanitize_graphviz_name(name: &str) -> String {
             out.push('_');
         }
     }
-    if out.is_empty() {
-        "_".to_string()
-    } else {
-        out
-    }
+    if out.is_empty() { "_".to_string() } else { out }
 }
 
 #[wasm_bindgen]
@@ -232,6 +234,7 @@ pub fn compile(
     let (cfgs, cfg_warnings) = match lower_cfgs(&program, &sema, &opt_config) {
         Ok(result) => result,
         Err(lower_error) => {
+            let mut gviz = None;
             match lower_error {
                 LowerError::NoBody => errors.push(Diagnostic {
                     range: None,
@@ -264,7 +267,8 @@ pub fn compile(
                         });
                     }
                 }
-                LowerError::MalformedPhiInfo(_info) => {
+                LowerError::MalformedPhiInfo(info) => {
+                    gviz = Some(info.display_in_graphviz(&sema));
                     errors.push(Diagnostic {
                         range: None,
                         error_name: "MalformedPhiInfo".to_string(),
@@ -277,7 +281,7 @@ pub fn compile(
                 ok: false,
                 ast: None,
                 cfg_text: None,
-                graphviz: None,
+                graphviz: gviz,
                 errors,
                 warnings,
             });
