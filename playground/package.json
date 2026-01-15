@@ -15,6 +15,7 @@
     "@uiw/react-codemirror": "^4.25.4",
     "bun-plugin-tailwind": "^0.1.2",
     "d3": "^7.9.0",
+    "dnd-kit": "^0.0.2",
     "graphviz-react": "^1.2.5",
     "react": "^19",
     "react-dom": "^19",

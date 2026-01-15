@@ -35,6 +35,11 @@ type ViewOption = {
   isDisabled?: boolean;
 };
 
+type OptimizationOption = {
+  value: string;
+  description: string;
+};
+
 function IRView({ cfgText }: { cfgText: string | null }) {
   return (
     <pre className="h-full overflow-auto whitespace-pre-wrap p-4 font-mono text-sm text-slate-200">
@@ -336,6 +341,10 @@ export function App() {
   );
   const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
   const [view, setView] = useState<ViewKind>("ir");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [draggedOptimization, setDraggedOptimization] = useState<number | null>(null);
+  const [addOptimizationSelection, setAddOptimizationSelection] =
+    useState<OptimizationOption | null>(null);
 
   const diagnostics = useMemo(() => {
     if (!compileResult) return [];
@@ -427,7 +436,7 @@ export function App() {
     []
   );
 
-  const optimizationOptions = useMemo(
+  const optimizationOptions = useMemo<OptimizationOption[]>(
     () => [
       {
         value: "cp",
@@ -492,9 +501,26 @@ export function App() {
     exampleOptions.find(option => option.value === selectedExampleId) ??
     exampleOptions[0] ??
     null;
-  const selectedOptimizations = optimizationOptions.filter(option =>
-    optimizations.includes(option.value)
-  );
+  const optimizationLookup = useMemo(() => {
+    return new Map(optimizationOptions.map(option => [option.value, option]));
+  }, [optimizationOptions]);
+
+  const reorderOptimizations = (sourceIndex: number, targetIndex: number) => {
+    setOptimizations(current => {
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      if (sourceIndex >= current.length || targetIndex >= current.length) return current;
+      if (sourceIndex === targetIndex) return current;
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      if (!moved) return current;
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const removeOptimizationAt = (index: number) => {
+    setOptimizations(current => current.filter((_, itemIndex) => itemIndex !== index));
+  };
 
   return (
     <div className="h-screen w-screen bg-[#0f1115] text-slate-100">
@@ -502,73 +528,156 @@ export function App() {
         <div className="mr-auto text-sm tracking-[0.3em] text-slate-200">
           Compiler Explorer
         </div>
-        <div className="min-w-[320px] flex-1 max-w-[640px]">
-          <Select
-            classNamePrefix="cm-select"
-            options={optimizationOptions}
-            value={selectedOptimizations}
-            placeholder="Optimizations"
-            onChange={options =>
-              setOptimizations((options ?? []).map(option => option.value))
-            }
-            isMulti
-            closeMenuOnSelect={false}
-            getOptionLabel={option => option.value}
-            getOptionValue={option => option.value}
-            formatOptionLabel={(option, { context }) =>
-              context === "menu" ? (
-                <span title={option.description}>{option.value}</span>
-              ) : (
-                <span title={option.description}>{option.value}</span>
-              )
-            }
-            styles={{
-              control: base => ({
-                ...base,
-                backgroundColor: "transparent",
-                border: "1px solid rgba(148, 163, 184, 0.2)",
-                minHeight: 36,
-                boxShadow: "none",
-              }),
-              indicatorsContainer: base => ({
-                ...base,
-                height: 36,
-              }),
-              input: base => ({
-                ...base,
-                margin: 0,
-                padding: 0,
-              }),
-              menu: base => ({
-                ...base,
-                backgroundColor: "#0f1115",
-                border: "1px solid rgba(148, 163, 184, 0.2)",
-              }),
-              multiValue: base => ({
-                ...base,
-                backgroundColor: "rgba(148, 163, 184, 0.2)",
-                marginRight: 6,
-              }),
-              multiValueLabel: base => ({
-                ...base,
-                color: "#e2e8f0",
-                letterSpacing: "0.2em",
-              }),
-              option: (base, state) => ({
-                ...base,
-                backgroundColor: state.isFocused ? "#1f2937" : "transparent",
-                color: state.isDisabled ? "#475569" : "#e2e8f0",
-                cursor: state.isDisabled ? "not-allowed" : "pointer",
-                letterSpacing: "0.2em",
-              }),
-              indicatorSeparator: base => ({ ...base, display: "none" }),
-              dropdownIndicator: base => ({
-                ...base,
-                color: "#94a3b8",
-                padding: "0 8px",
-              }),
-            }}
-          />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(open => !open)}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-[#101423] px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-200 hover:bg-[#1f2937]"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-4 w-4 text-slate-200"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M11.983 2.25c-.614 0-1.108.494-1.108 1.108v.954a7.5 7.5 0 0 0-1.924.803l-.675-.675a1.108 1.108 0 1 0-1.567 1.567l.675.675a7.5 7.5 0 0 0-.803 1.924h-.954a1.108 1.108 0 0 0 0 2.216h.954a7.5 7.5 0 0 0 .803 1.924l-.675.675a1.108 1.108 0 1 0 1.567 1.567l.675-.675a7.5 7.5 0 0 0 1.924.803v.954a1.108 1.108 0 0 0 2.216 0v-.954a7.5 7.5 0 0 0 1.924-.803l.675.675a1.108 1.108 0 1 0 1.567-1.567l-.675-.675a7.5 7.5 0 0 0 .803-1.924h.954a1.108 1.108 0 1 0 0-2.216h-.954a7.5 7.5 0 0 0-.803-1.924l.675-.675a1.108 1.108 0 1 0-1.567-1.567l-.675.675a7.5 7.5 0 0 0-1.924-.803v-.954c0-.614-.494-1.108-1.108-1.108Z" />
+              <circle cx="12" cy="12" r="3.25" />
+            </svg>
+            Optimizer
+          </button>
+          {isSettingsOpen && (
+            <div
+              className="absolute right-0 z-20 mt-3 w-[520px] rounded-2xl border border-white/10 bg-[#0b0d11] p-4 text-sm text-slate-200 shadow-xl"
+              onDragOver={event => event.preventDefault()}
+            >
+              <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400">
+                <span>Optimization Order</span>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="rounded-md border border-white/10 bg-[#101423] px-2 py-1 text-[10px] uppercase text-slate-300 hover:bg-[#1f2937]"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mb-4">
+                <Select
+                  classNamePrefix="cm-select"
+                  options={optimizationOptions}
+                  value={addOptimizationSelection}
+                  placeholder="Add optimization pass"
+                  onChange={option => {
+                    if (!option) return;
+                    setOptimizations(current => [...current, option.value]);
+                    setAddOptimizationSelection(null);
+                  }}
+                  getOptionLabel={option => option.value}
+                  getOptionValue={option => option.value}
+                  formatOptionLabel={(option, { context }) =>
+                    context === "menu" ? (
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.2em] text-slate-100">
+                          {option.value}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-300">
+                          {option.description}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs uppercase tracking-[0.2em] text-slate-200">
+                        {option.value}
+                      </span>
+                    )
+                  }
+                  styles={{
+                    control: base => ({
+                      ...base,
+                      backgroundColor: "#0f1115",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                      minHeight: 36,
+                      boxShadow: "none",
+                    }),
+                    indicatorsContainer: base => ({
+                      ...base,
+                      height: 36,
+                    }),
+                    input: base => ({
+                      ...base,
+                      margin: 0,
+                      padding: 0,
+                    }),
+                    menu: base => ({
+                      ...base,
+                      backgroundColor: "#0f1115",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                    }),
+                    singleValue: base => ({
+                      ...base,
+                      color: "#e2e8f0",
+                    }),
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isFocused ? "#1f2937" : "transparent",
+                      color: state.isDisabled ? "#475569" : "#e2e8f0",
+                      cursor: state.isDisabled ? "not-allowed" : "pointer",
+                    }),
+                    indicatorSeparator: base => ({ ...base, display: "none" }),
+                    dropdownIndicator: base => ({
+                      ...base,
+                      color: "#94a3b8",
+                      padding: "0 8px",
+                    }),
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                {optimizations.map((value, index) => {
+                  const option = optimizationLookup.get(value);
+                  if (!option) return null;
+                  return (
+                    <div
+                      key={`${value}-${index}`}
+                      draggable
+                      onDragStart={event => {
+                        event.dataTransfer.setData("text/plain", String(index));
+                        setDraggedOptimization(index);
+                      }}
+                      onDragEnd={() => setDraggedOptimization(null)}
+                      onDragOver={event => event.preventDefault()}
+                      onDrop={() => {
+                        if (draggedOptimization === null) return;
+                        reorderOptimizations(draggedOptimization, index);
+                        setDraggedOptimization(null);
+                      }}
+                      className="flex items-start gap-3 rounded-xl border border-white/10 bg-[#101423] px-3 py-2 cursor-move"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.2em] text-slate-100">
+                          <span>{option.value}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeOptimizationAt(index)}
+                            className="rounded-md border border-white/10 bg-[#0f1115] px-2 py-1 text-[10px] uppercase text-slate-300 hover:bg-[#1f2937]"
+                            aria-label={`Remove ${option.value}`}
+                          >
+                            X
+                          </button>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-300">{option.description}</p>
+                      </div>
+                      <div className="pt-1 text-slate-400">
+                        <span className="block text-lg leading-none">⋮</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <SplitPane
