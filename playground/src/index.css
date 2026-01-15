@@ -68,17 +68,7 @@
 }
 
 .graphviz-view text {
-  fill: #e2e8f0;
+  fill: #000000;
   font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
-}
-
-.graphviz-view path,
-.graphviz-view line,
-.graphviz-view polygon {
-  stroke: rgba(148, 163, 184, 0.7);
-}
-
-.graphviz-view polygon {
-  fill: rgba(15, 17, 21, 0.6);
 }

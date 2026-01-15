@@ -7,6 +7,21 @@ import { lintGutter, linter, type Diagnostic } from "@codemirror/lint";
 import Select from "react-select";
 import * as d3 from "d3";
 import { Graphviz } from "graphviz-react";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { compile } from "./wasm";
 import { examples } from "./examples";
 import "./index.css";
@@ -38,6 +53,11 @@ type ViewOption = {
 type OptimizationOption = {
   value: string;
   description: string;
+};
+
+type OptimizationInstance = {
+  id: string;
+  value: string;
 };
 
 function IRView({ cfgText }: { cfgText: string | null }) {
@@ -326,6 +346,61 @@ function GraphVizView({ graphviz }: { graphviz: string | null }) {
   );
 }
 
+function SortableOptimizationRow({
+  item,
+  description,
+  onRemove,
+}: {
+  item: OptimizationInstance;
+  description: string;
+  onRemove: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : 1,
+    boxShadow: isDragging ? "0 12px 30px rgba(0, 0, 0, 0.35)" : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-start gap-3 rounded-xl border border-white/10 bg-[#101423] px-3 py-2"
+    >
+      <div className="flex-1">
+        <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.2em] text-slate-100">
+          <span>{item.value}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onRemove(item.id)}
+              className="rounded-md border border-white/10 bg-[#0f1115] px-2 py-1 text-[10px] uppercase text-slate-300 hover:bg-[#1f2937]"
+              aria-label={`Remove ${item.value}`}
+            >
+              X
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-white/10 bg-[#0f1115] px-2 py-1 text-[10px] uppercase text-slate-300 hover:bg-[#1f2937] cursor-grab active:cursor-grabbing"
+              aria-label={`Reorder ${item.value}`}
+              {...attributes}
+              {...listeners}
+            >
+              ⋮
+            </button>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-slate-300">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const [sizes, setSizes] = useState<[number | string, number | string]>([520, "auto"]);
   const [outputSizes, setOutputSizes] = useState<[number | string, number | string]>([
@@ -336,15 +411,25 @@ export function App() {
     examples[0]?.id ?? ""
   );
   const [code, setCode] = useState(() => examples[0]?.code ?? "");
-  const [optimizations, setOptimizations] = useState<string[]>(
-    () => examples[0]?.optimizations ?? []
+  const optimizationIdRef = useRef(0);
+  const buildOptimizationInstance = (value: string): OptimizationInstance => ({
+    id: `opt-${optimizationIdRef.current++}`,
+    value,
+  });
+
+  const [optimizations, setOptimizations] = useState<OptimizationInstance[]>(
+    () => (examples[0]?.optimizations ?? []).map(buildOptimizationInstance)
   );
   const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
   const [view, setView] = useState<ViewKind>("ir");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [draggedOptimization, setDraggedOptimization] = useState<number | null>(null);
   const [addOptimizationSelection, setAddOptimizationSelection] =
     useState<OptimizationOption | null>(null);
+
+  const optimizationValues = useMemo(
+    () => optimizations.map(item => item.value),
+    [optimizations]
+  );
 
   const diagnostics = useMemo(() => {
     if (!compileResult) return [];
@@ -382,7 +467,7 @@ export function App() {
         async view => {
           try {
             const source = view.state.doc.toString();
-            const result = await compile(source, optimizations, true);
+            const result = await compile(source, optimizationValues, true);
             if (!result) {
               setCompileResult(null);
               return [];
@@ -418,7 +503,7 @@ export function App() {
         },
         { delay: 300 }
       ),
-    [optimizations]
+    [optimizationValues]
   );
 
   const statusColor = useMemo(() => {
@@ -505,21 +590,23 @@ export function App() {
     return new Map(optimizationOptions.map(option => [option.value, option]));
   }, [optimizationOptions]);
 
-  const reorderOptimizations = (sourceIndex: number, targetIndex: number) => {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
     setOptimizations(current => {
-      if (sourceIndex < 0 || targetIndex < 0) return current;
-      if (sourceIndex >= current.length || targetIndex >= current.length) return current;
-      if (sourceIndex === targetIndex) return current;
-      const next = [...current];
-      const [moved] = next.splice(sourceIndex, 1);
-      if (!moved) return current;
-      next.splice(targetIndex, 0, moved);
-      return next;
+      const oldIndex = current.findIndex(item => item.id === active.id);
+      const newIndex = current.findIndex(item => item.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return current;
+      return arrayMove(current, oldIndex, newIndex);
     });
   };
 
-  const removeOptimizationAt = (index: number) => {
-    setOptimizations(current => current.filter((_, itemIndex) => itemIndex !== index));
+  const removeOptimization = (id: string) => {
+    setOptimizations(current => current.filter(item => item.id !== id));
   };
 
   return (
@@ -572,7 +659,10 @@ export function App() {
                   placeholder="Add optimization pass"
                   onChange={option => {
                     if (!option) return;
-                    setOptimizations(current => [...current, option.value]);
+                    setOptimizations(current => [
+                      ...current,
+                      buildOptimizationInstance(option.value),
+                    ]);
                     setAddOptimizationSelection(null);
                   }}
                   getOptionLabel={option => option.value}
@@ -634,48 +724,31 @@ export function App() {
                   }}
                 />
               </div>
-              <div className="space-y-2">
-                {optimizations.map((value, index) => {
-                  const option = optimizationLookup.get(value);
-                  if (!option) return null;
-                  return (
-                    <div
-                      key={`${value}-${index}`}
-                      draggable
-                      onDragStart={event => {
-                        event.dataTransfer.setData("text/plain", String(index));
-                        setDraggedOptimization(index);
-                      }}
-                      onDragEnd={() => setDraggedOptimization(null)}
-                      onDragOver={event => event.preventDefault()}
-                      onDrop={() => {
-                        if (draggedOptimization === null) return;
-                        reorderOptimizations(draggedOptimization, index);
-                        setDraggedOptimization(null);
-                      }}
-                      className="flex items-start gap-3 rounded-xl border border-white/10 bg-[#101423] px-3 py-2 cursor-move"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.2em] text-slate-100">
-                          <span>{option.value}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeOptimizationAt(index)}
-                            className="rounded-md border border-white/10 bg-[#0f1115] px-2 py-1 text-[10px] uppercase text-slate-300 hover:bg-[#1f2937]"
-                            aria-label={`Remove ${option.value}`}
-                          >
-                            X
-                          </button>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-300">{option.description}</p>
-                      </div>
-                      <div className="pt-1 text-slate-400">
-                        <span className="block text-lg leading-none">⋮</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={optimizations.map(item => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {optimizations.map(item => {
+                      const option = optimizationLookup.get(item.value);
+                      if (!option) return null;
+                      return (
+                        <SortableOptimizationRow
+                          key={item.id}
+                          item={item}
+                          description={option.description}
+                          onRemove={removeOptimization}
+                        />
+                      );
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
           )}
         </div>
@@ -701,7 +774,9 @@ export function App() {
                   const example = examples.find(item => item.id === option.value);
                   if (example) {
                     setCode(example.code);
-                    setOptimizations(example.optimizations);
+                    setOptimizations(
+                      example.optimizations.map(value => buildOptimizationInstance(value))
+                    );
                   }
                 }}
                 isSearchable={false}
