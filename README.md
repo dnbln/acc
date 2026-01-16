@@ -65,3 +65,11 @@ If you see missing target errors, install it first:
 ```sh
 rustup target add wasm32-unknown-unknown
 ```
+
+## Running the web frontend
+
+```sh
+cd playground
+bun i
+bun run dev
+```
