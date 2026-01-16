@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import plugin from "bun-plugin-tailwind";
 import { existsSync } from "fs";
-import { rm } from "fs/promises";
+import { cp, rm } from "fs/promises";
 import path from "path";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
@@ -147,3 +147,11 @@ console.table(outputTable);
 const buildTime = (end - start).toFixed(2);
 
 console.log(`\n✅ Build completed in ${buildTime}ms\n`);
+
+const wasmSrcDir = path.join(process.cwd(), "src", "wasm");
+const wasmOutDir = path.join(outdir, "wasm");
+
+if (existsSync(wasmSrcDir)) {
+  await cp(wasmSrcDir, wasmOutDir, { recursive: true });
+  console.log(`🧩 Copied WASM assets to ${wasmOutDir}\n`);
+}
