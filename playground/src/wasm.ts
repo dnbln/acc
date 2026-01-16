@@ -9,7 +9,7 @@ async function initWasm() {
     wasmInit = (async () => {
       try {
         const mod = await import("./wasm/acc.js");
-        const wasmUrl = new URL("/wasm/acc_bg.wasm", window.location.origin);
+        const wasmUrl = new URL("./wasm/acc_bg.wasm", window.location.href);
         await mod.default(wasmUrl);
         wasmReady = true;
         return true;
