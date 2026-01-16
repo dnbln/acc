@@ -1,4 +1,10 @@
-# CS4555 Compiler Construction Project Group
+# CS4555 Compiler Construction Project Group 15
+
+**Group members**:
+- James Bingen
+- Dinu Blanovschi
+- Yigit Çolakoğlu
+
 
 **Responsible TA**: Arthur Jacques
 
