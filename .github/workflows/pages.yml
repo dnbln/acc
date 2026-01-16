@@ -32,7 +32,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-bindgen
-        run: cargo install wasm-bindgen-cli --locked
+        run: cargo install wasm-bindgen-cli --version 0.2.106 --locked
 
       - name: Install playground dependencies
         working-directory: playground
